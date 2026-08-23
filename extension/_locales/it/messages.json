@@ -1,0 +1,9 @@
+{
+  "appName": { "message": "FolioPause" },
+  "appDescription": { "message": "Uno strumento locale e indipendente per Google Foto. Scorri per segnare o conservare; nulla va nel Cestino senza conferma." },
+  "actionTitle": { "message": "Apri FolioPause" },
+  "pendingTitle": {
+    "message": "FolioPause — $COUNT$ foto in attesa di revisione",
+    "placeholders": { "count": { "content": "$1" } }
+  }
+}

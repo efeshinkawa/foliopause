@@ -1,0 +1,9 @@
+{
+  "appName": { "message": "FolioPause" },
+  "appDescription": { "message": "Una herramienta local e independiente para Google Fotos. Desliza para marcar o conservar; nada va a la Papelera sin confirmar." },
+  "actionTitle": { "message": "Abrir FolioPause" },
+  "pendingTitle": {
+    "message": "FolioPause — $COUNT$ fotos pendientes de revisión",
+    "placeholders": { "count": { "content": "$1" } }
+  }
+}

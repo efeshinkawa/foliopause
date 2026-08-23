@@ -1,0 +1,9 @@
+{
+  "appName": { "message": "FolioPause" },
+  "appDescription": { "message": "Ein unabhängiges, lokales Werkzeug für Google Fotos. Markieren oder behalten; ohne Bestätigung landet nichts im Papierkorb." },
+  "actionTitle": { "message": "FolioPause öffnen" },
+  "pendingTitle": {
+    "message": "FolioPause — $COUNT$ Fotos warten auf Prüfung",
+    "placeholders": { "count": { "content": "$1" } }
+  }
+}

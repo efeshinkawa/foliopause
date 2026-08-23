@@ -1,0 +1,9 @@
+{
+  "appName": { "message": "FolioPause" },
+  "appDescription": { "message": "Google Fotoğraflar için bağımsız ve yerel inceleme aracı. İşaretle veya tut; onaylamadan hiçbir şey Çöp Kutusu'na taşınmaz." },
+  "actionTitle": { "message": "FolioPause'u aç" },
+  "pendingTitle": {
+    "message": "FolioPause — $COUNT$ fotoğraf inceleme bekliyor",
+    "placeholders": { "count": { "content": "$1" } }
+  }
+}

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'">
+<title>FolioPause console production smoke</title>
+</head>
+<body>
+<pre id="log">console production smoke…</pre>
+<script>window.__productionKind='console';</script>
+<script src="mock.js"></script>
+<script src="../dist/foliopause-console.js"></script>
+<script src="production-smoke.js"></script>
+</body>
+</html>

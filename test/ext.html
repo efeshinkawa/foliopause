@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'">
+<title>gpswipe extension smoke test</title></head>
+<body>
+<p id="p">extension smoke test — the content script must inject itself here</p>
+<script src="mock.js"></script>
+<script>
+  // ask the MAIN-world content script to open, the same way the toolbar bridge does
+  setTimeout(() => window.postMessage({ __gpswipe: 'toggle' }, location.origin), 2500);
+</script>
+</body></html>

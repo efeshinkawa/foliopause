@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<!-- emulate photos.google.com: Trusted Types enforced, no innerHTML allowed -->
+<meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'">
+<title>gpswipe test harness</title>
+<style>
+  body{margin:0;font-family:sans-serif;background:#fff;color:#111}
+  #log{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;padding:10px}
+  #gsearch{margin:0 10px 10px}
+</style>
+</head>
+<body>
+<div id="log">harness loading…</div>
+<input id="gsearch" placeholder="page input (focus test)">
+<script src="mock.js"></script>
+<script src="generated/gpswipe-test.js"></script>
+<script src="tests.js"></script>
+</body>
+</html>
