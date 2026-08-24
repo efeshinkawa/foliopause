@@ -14,6 +14,44 @@ swipe never deletes a photo by itself.
 > Google Photos is a trademark of Google LLC. FolioPause is an independent
 > project and is not affiliated with, sponsored by, or endorsed by Google.
 
+## Risk notice — read before installing
+
+> [!WARNING]
+> **Using FolioPause may put your Google account at risk. By installing or
+> running it, you accept that risk.**
+
+Google's official Photos Library API cannot list an entire existing library or
+move arbitrary media to Trash. FolioPause therefore drives the same
+undocumented, same-origin RPCs that the Google Photos website itself uses, from
+the session you are already signed in to.
+
+Google's [Terms of Service](https://policies.google.com/terms) prohibit "using
+automated means to access content from any of our services in violation of the
+machine-readable instructions on our web pages" and "bypassing our systems or
+protective measures", and permit Google to "suspend or terminate your access to
+the services or delete your Google Account" for a material or repeated breach.
+
+Several things distinguish FolioPause from the bulk-scraping cases Google has
+actually pursued:
+
+- it reads only **your own** library, never content belonging to anyone else;
+- it runs inside your own authenticated session, at human interaction rates,
+  with no proxies, no credential sharing and no attempt to conceal identity;
+- every request follows an action you took, and deleting only moves items to
+  Google's Trash, which stays recoverable for 60 days.
+
+What cannot be ruled out is that Google treats third-party use of an internal
+interface as circumventing the intended one. **That exposure lands on your
+Google account, not on this project.** Google may also change these interfaces
+at any time without notice.
+
+If that trade-off is not acceptable to you, do not install FolioPause.
+
+**Before you rely on it:** run **Dry Run** first, keep independent backups of
+anything you cannot lose, and check your Trash after every batch. FolioPause is
+provided "as is", without warranty of any kind and without liability, under the
+[MIT License](LICENSE).
+
 ## Install
 
 ### Recommended: Chrome extension
