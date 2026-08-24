@@ -25,6 +25,62 @@ using a Google mark (or a modified one) as the extension logo. FolioPause does
 neither. Keep the "for Google Photos™" text smaller than the FolioPause mark in
 any promotional artwork.
 
+
+**Detailed description** (paste into the dashboard's Description field)
+
+```
+FolioPause adds a card-based review flow to Google Photos™, running entirely in
+your own browser.
+
+Swipe left to mark a photo for deletion, right to keep it. Nothing is deleted
+while you swipe. Marked photos collect in a review list, and only when you open
+that list and confirm does FolioPause move them — to Google's Trash, where they
+remain recoverable for 60 days.
+
+WHAT IT DOES
+- Swipe, or use the arrow keys, to sort through a large library quickly
+- Undo any decision, one at a time or all at once
+- A review reminder every 100 photos, plus a Review button that is always available
+- Scoreboard showing reviewed, kept, pending and moved-to-trash counts
+- Dry Run mode to rehearse the whole flow without touching anything
+- Export a JSON log of every deletion
+- Available in English, Turkish, German, Spanish and Italian
+
+PRIVACY
+No server, no analytics, no advertising, no account system, no API key. Your
+photos and your decisions never reach the developer. Decisions, settings and the
+deletion log are stored locally in your browser. Network traffic goes only to
+Google Photos and Google-hosted media endpoints, using the session you are
+already signed in to.
+
+PERMISSIONS
+FolioPause runs only on photos.google.com. The activeTab permission is used
+solely so the toolbar button can reopen the interface in your current tab.
+
+OPEN SOURCE
+Source: https://github.com/efeshinkawa/foliopause — MIT licensed.
+
+IMPORTANT
+Google's official Photos Library API cannot list a whole library or move items
+to Trash, so FolioPause uses the same undocumented, same-origin interfaces the
+Google Photos website itself uses, from your own signed-in session. Google may
+change these without notice, and this use may conflict with Google's Terms of
+Service, which permit Google to suspend accounts for material breaches. Use Dry
+Run first, keep backups, and verify your Trash. You accept this risk when you
+use FolioPause.
+
+Google Photos is a trademark of Google LLC. FolioPause is an independent project
+and is not affiliated with, sponsored by, or endorsed by Google.
+```
+
+The IMPORTANT paragraph is a deliberate user-facing disclosure of the Terms of
+Service risk, which falls on the installing user's Google account rather than on
+the project. Removing it is a judgement call for the publisher, not a technical
+requirement.
+
+**Category:** Productivity
+**Language:** English
+
 **Single purpose**
 
 > FolioPause helps a signed-in user review their own Google Photos library and
@@ -78,8 +134,8 @@ GitHub Pages site or another stable HTTPS page before submission.
 - [x] Independent name, palette, and product mark
 - [x] English privacy policy and trademark disclaimer
 - [x] Localized extension name and toolbar copy
-- [ ] 1280×800 or 640×400 screenshots
-- [ ] 440×280 promotional image
+- [x] 1280×800 screenshots (swipe view, review view)
+- [x] 440×280 promotional image
 - [ ] Public privacy-policy URL
 - [x] ZIP with `manifest.json` at the archive root
 - [ ] Private trusted-tester review
