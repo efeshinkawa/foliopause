@@ -3,3 +3,9 @@ node_modules/
 .playwright-cli/
 test/generated/
 *.log
+
+# AI planning notes - local only, never published
+.planning/
+
+# built store packages
+*.zip

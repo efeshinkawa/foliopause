@@ -1,6 +1,6 @@
 {
   "appName": { "message": "FolioPause" },
-  "appDescription": { "message": "An independent, local review tool for Google Photos. Swipe to mark or keep, then confirm before anything moves to Trash." },
+  "appDescription": { "message": "An independent, local review tool for Google Photos™. Swipe to mark or keep, then confirm before anything moves to Trash." },
   "actionTitle": { "message": "Open FolioPause" },
   "pendingTitle": {
     "message": "FolioPause — $COUNT$ photos waiting for review",
