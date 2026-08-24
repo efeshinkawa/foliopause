@@ -6,6 +6,8 @@
 
 const QUEUE_TARGET = 12;   // keep this many decided-free items buffered
 const PAGE_SIZE = 200;
+const MAX_SCAN_PAGES = 40; // one bounded scan; continuing requires a user retry
+const MAX_SCAN_MS = 20000;
 
 const feed = {
   queue: [],
@@ -69,8 +71,11 @@ const feed = {
     const gen = this.gen;
     app.renderState();
     try {
-      let guard = 0;
-      while (this.queue.length < QUEUE_TARGET && !this.exhausted && guard++ < 40) {
+      let scannedPages = 0;
+      const scanStarted = performance.now();
+      while (this.queue.length < QUEUE_TARGET && !this.exhausted
+        && scannedPages < MAX_SCAN_PAGES && performance.now() - scanStarted < MAX_SCAN_MS) {
+        scannedPages++;
         const requestKey = this.nextPageId === undefined ? '__first__' : String(this.nextPageId);
         if (this.requestedPages.has(requestKey)) throw new Error('pagination token repeated: ' + requestKey);
         this.requestedPages.add(requestKey);
@@ -89,6 +94,13 @@ const feed = {
           throw e;
         }
         if (gen !== this.gen) return;  // a reset happened while we were waiting
+        const structurallyUsable = page.items.filter(validMarkedItem);
+        if (structurallyUsable.length !== page.rawItemCount) {
+          // The page was not consumed: a later Retry must be allowed to fetch
+          // the same token after a page reload or compatibility fix.
+          this.requestedPages.delete(requestKey);
+          throw new Error('library response contains no usable media rows');
+        }
         for (const it of page.items) {
           if (this.accept(it)) { this.queue.push(it); this.seen.add(it.mediaKey); }
         }
@@ -98,6 +110,12 @@ const feed = {
         // Google can return an empty intermediate page with a continuation
         // token.  Only the absence of that token proves the source is done.
         if (!page.nextPageId) this.exhausted = true;
+      }
+      // `finally -> onFeedChanged -> swipe.render -> feed.take()` used to call
+      // ensure() again immediately here, defeating the 40-page guard. Pause in
+      // a recoverable state instead; Retry continues from the retained token.
+      if (!this.exhausted && (scannedPages >= MAX_SCAN_PAGES || performance.now() - scanStarted >= MAX_SCAN_MS)) {
+        this.error = 'scan-paused';
       }
       this.loadInfo();
     } catch (e) {

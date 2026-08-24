@@ -431,12 +431,14 @@ const STRINGS = {
     video: 'Video', live: 'Hareketli', fav: 'Favori', archived: 'Arşiv',
     // states
     loading: 'Yükleniyor…',
+    scanPausedTitle: 'Bu bölümde yeni fotoğraf bulunamadı',
+    scanPausedSub: 'Uzun bir aralık tarandı. Kaldığın yerden devam etmek için tekrar dene.',
     doneTitle: 'Hepsi bitti',
     doneSub: 'Bu kaynakta incelenmemiş fotoğraf kalmadı. Ayarlardan kaynağı ya da başlangıç tarihini değiştirebilirsin.',
     doneStats: 'Bu oturumda {k} tutuldu, {d} silindi.',
     errLoadTitle: 'Liste yüklenemedi',
     errLoadSub: 'Bağlantı ya da oturum sorunu olabilir.',
-    retry: 'Tekrar dene',
+    retry: 'Tekrar dene', reloadPage: 'Sayfayı yenile',
     localLoadTitle: 'Yerel kayıt açılamadı',
     localLoadBody: 'Tutulan ve inceleme bekleyen fotoğrafların tamamı güvenle okunamadı. Fotoğrafları yeniden sunmamak için kaydırma durduruldu; tekrar deneyebilir veya kapatabilirsin.',
     errToken: 'Oturum bilgisi bulunamadı — photos.google.com ana sayfasını yenile',
@@ -556,12 +558,14 @@ const STRINGS = {
     prev: 'Previous', next: 'Next',
     video: 'Video', live: 'Live', fav: 'Favorite', archived: 'Archived',
     loading: 'Loading…',
+    scanPausedTitle: 'No new photos found in this section',
+    scanPausedSub: 'A long range was scanned. Retry to continue from where FolioPause stopped.',
     doneTitle: 'All done',
     doneSub: 'No unreviewed photos left in this source. Change the source or start date in settings.',
     doneStats: 'This session: {k} kept, {d} deleted.',
     errLoadTitle: 'Could not load the list',
     errLoadSub: 'This may be a network or session problem.',
-    retry: 'Retry',
+    retry: 'Retry', reloadPage: 'Reload page',
     localLoadTitle: 'Could not open local state',
     localLoadBody: 'The complete kept and pending-review lists could not be read safely. Swiping is blocked so no photo is offered again; retry or close the app.',
     errToken: 'Session data not found — reload the photos.google.com home page',
@@ -693,12 +697,14 @@ STRINGS.it = {
   prev: 'Precedente', next: 'Successiva',
   video: 'Video', live: 'Foto in movimento', fav: 'Preferita', archived: 'Archiviata',
   loading: 'Caricamento…',
+  scanPausedTitle: 'Nessuna nuova foto trovata in questa sezione',
+  scanPausedSub: 'È stato analizzato un intervallo lungo. Riprova per continuare dal punto in cui FolioPause si è fermato.',
   doneTitle: 'Tutto fatto',
   doneSub: 'Non ci sono più foto da esaminare in questa fonte. Modifica la fonte o la data di inizio nelle impostazioni.',
   doneStats: 'In questa sessione: {k} conservate, {d} eliminate.',
   errLoadTitle: 'Impossibile caricare l\'elenco',
   errLoadSub: 'Potrebbe esserci un problema di rete o di sessione.',
-  retry: 'Riprova',
+  retry: 'Riprova', reloadPage: 'Ricarica pagina',
   errToken: 'Dati della sessione non trovati — ricarica la pagina iniziale di photos.google.com',
   marked: 'Contrassegnata per l\'eliminazione',
   keptToast: 'Conservata',
@@ -809,12 +815,14 @@ STRINGS.es = {
   prev: 'Anterior', next: 'Siguiente',
   video: 'Vídeo', live: 'Foto en movimiento', fav: 'Favorita', archived: 'Archivada',
   loading: 'Cargando…',
+  scanPausedTitle: 'No se encontraron fotos nuevas en esta sección',
+  scanPausedSub: 'Se analizó un intervalo largo. Reintenta para continuar desde donde se detuvo FolioPause.',
   doneTitle: 'Todo listo',
   doneSub: 'No quedan fotos sin revisar en esta fuente. Cambia la fuente o la fecha de inicio en los ajustes.',
   doneStats: 'En esta sesión: {k} conservadas, {d} eliminadas.',
   errLoadTitle: 'No se pudo cargar la lista',
   errLoadSub: 'Puede deberse a un problema de red o de sesión.',
-  retry: 'Reintentar',
+  retry: 'Reintentar', reloadPage: 'Recargar página',
   errToken: 'No se encontraron los datos de la sesión — vuelve a cargar la página principal de photos.google.com',
   marked: 'Marcada para eliminar',
   keptToast: 'Conservada',
@@ -925,12 +933,14 @@ STRINGS.de = {
   prev: 'Zurück', next: 'Weiter',
   video: 'Video', live: 'Bewegungsfoto', fav: 'Favorit', archived: 'Archiviert',
   loading: 'Wird geladen…',
+  scanPausedTitle: 'In diesem Abschnitt wurden keine neuen Fotos gefunden',
+  scanPausedSub: 'Ein langer Bereich wurde durchsucht. Versuche es erneut, um dort fortzufahren, wo FolioPause angehalten hat.',
   doneTitle: 'Alles erledigt',
   doneSub: 'In dieser Quelle sind keine ungeprüften Fotos mehr vorhanden. Ändere die Quelle oder das Startdatum in den Einstellungen.',
   doneStats: 'In dieser Sitzung: {k} behalten, {d} gelöscht.',
   errLoadTitle: 'Die Liste konnte nicht geladen werden',
   errLoadSub: 'Möglicherweise liegt ein Netzwerk- oder Sitzungsproblem vor.',
-  retry: 'Erneut versuchen',
+  retry: 'Erneut versuchen', reloadPage: 'Seite neu laden',
   errToken: 'Sitzungsdaten nicht gefunden — lade die Startseite von photos.google.com neu',
   marked: 'Zum Löschen markiert',
   keptToast: 'Behalten',
@@ -1089,6 +1099,7 @@ const ICONS = {
   expand: ['M4 9.5v-5h5', 'M4.5 4.5l5.5 5.5', 'M20 14.5v5h-5', 'M19.5 19.5L14 14', 'M20 9.5v-5h-5', 'M19.5 4.5L14 10', 'M4 14.5v5h5', 'M4.5 19.5L10 14'],
   restore: ['M4.5 9.5h9.8a4.8 4.8 0 010 9.6H8', 'M8.4 5.3L4.2 9.5l4.2 4.2', 'M12 11.5v3l2 1.2'],
   warn: ['M12 4.2L21 19.5H3z', 'M12 10v4', 'M12 17v.02'],
+  search: ['M10.8 4.2a6.6 6.6 0 100 13.2 6.6 6.6 0 000-13.2z', 'M15.8 15.8l4 4'],
   image: ['M3.5 5.5h17v13h-17z', 'M8.4 11a1.6 1.6 0 100-3.2 1.6 1.6 0 000 3.2z', 'M3.5 16l4.8-4.2 4 3.4 3.2-2.6 5 4.3'],
   stack: ['M7.5 3.5h9a2 2 0 012 2v13a2 2 0 01-2 2h-9a2 2 0 01-2-2v-13a2 2 0 012-2z', 'M20.5 7v10', 'M3.5 7v10'],
   swipe: ['M13.5 3.5h5a2 2 0 012 2v13a2 2 0 01-2 2h-5', 'M9.5 20.5h-4a2 2 0 01-2-2v-13a2 2 0 012-2h4', 'M11.5 8.5L8 12l3.5 3.5'],
@@ -1209,6 +1220,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function rpc(rpcid, data, opts) {
   const retries = (opts && opts.retries) || 3;
+  const timeoutMs = (opts && opts.timeoutMs) || RPC_TIMEOUT_MS;
   if (!G.at || !G.sid || !G.bl) throw new Error('WIZ_global_data missing');
   const body = 'f.req=' + encodeURIComponent(JSON.stringify([[[rpcid, JSON.stringify(data), null, 'generic']]]))
              + '&at=' + encodeURIComponent(G.at) + '&';
@@ -1220,7 +1232,7 @@ async function rpc(rpcid, data, opts) {
   let lastErr;
   for (let attempt = 1; attempt <= retries; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), RPC_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -1314,9 +1326,22 @@ const api = {
   // source: 1 library, 2 archive, 3 both
   async listLibrary(o) {
     o = o || {};
-    const r = await rpc('lcxiM', [o.pageId || null, o.timestamp != null ? o.timestamp : null, o.pageSize || 200, null, 1, o.source || 1]);
+    // Listing is an interactive startup path: two bounded attempts keep a
+    // broken connection from looking like an endless loading screen. Retry in
+    // the UI remains available without weakening any destructive operation.
+    const r = await rpc(
+      'lcxiM',
+      [o.pageId || null, o.timestamp != null ? o.timestamp : null, o.pageSize || 200, null, 1, o.source || 1],
+      { retries: 2, timeoutMs: 8000 }
+    );
+    if (!Array.isArray(r) || !Array.isArray(r[0])) throw new Error('unexpected library response');
+    const rows = r[0];
     return {
-      items: ((r && r[0]) || []).map(parseItem).filter(Boolean),
+      items: rows.map(parseItem).filter(Boolean),
+      // Keep the pre-parse count so a future Google response-shape change is
+      // distinguishable from a legitimate empty page. Without this signal a
+      // malformed page can be paged through forever while the UI says Loading.
+      rawItemCount: rows.length,
       nextPageId: (r && r[1]) || null,
       lastItemTimestamp: r && r[2] != null && Number.isFinite(Number(r[2])) ? Number(r[2]) : null,
     };
@@ -1443,6 +1468,8 @@ const LS_STATE = 'gpSwipe.state.v2.' + ACCT;
 const LS_KEPT_LEGACY = ['gpSwipe.kept.v1', 'gpSwipe.kept.v1.' + ACCT];
 const IDB_NAME = 'gpSwipe-' + ACCT;
 const IDB_VERSION = 2;
+const STORE_TIMEOUT_MS = 5000;
+const LOCK_TIMEOUT_MS = 5000;
 
 const DEFAULTS = {
   settings: {
@@ -1507,66 +1534,170 @@ const store = {
   db: null,
   loaded: false,
   initPromise: null,
+  epoch: 0,
+  invalidated: false,
+  fallbackAllowed: !window.indexedDB,
   hasLock: false,
   lockRequest: null,
+  lockAttempt: null,
   lockRelease: null,
   lockAcquirePromise: null,
   releasePromise: null,
-  lockCancelRequested: false,
   stateWritable: false,
   lockApi: navigator.locks && typeof navigator.locks.request === 'function' ? navigator.locks : null,
   lockFailure: null,
+  operationTimeoutMs: STORE_TIMEOUT_MS,
+  lockTimeoutMs: LOCK_TIMEOUT_MS,
 
   init() {
+    if (this.invalidated) return Promise.reject(new Error('indexeddb connection invalidated; reload required'));
     if (this.loaded) return Promise.resolve(this.db);
     if (!this.initPromise) {
-      this.initPromise = (async () => {
-        await this.open();
+      const initEpoch = this.epoch;
+      let openedDb = null;
+      let tracked;
+      tracked = (async () => {
+        openedDb = await this.open();
         await this.load();
+        if (this.invalidated || this.epoch !== initEpoch || (openedDb && this.db !== openedDb)) {
+          throw new Error('indexeddb connection changed during hydration');
+        }
         return this.db;
       })().catch((e) => {
         // Let a later explicit Retry reopen/re-read the store. The UI remains
         // fail-closed until a complete snapshot can be hydrated.
         this.loaded = false;
-        this.initPromise = null;
+        if (openedDb) { try { openedDb.close(); } catch (closeError) { /* ignore */ } }
+        if (this.db === openedDb) this.db = null;
         throw e;
+      }).finally(() => {
+        if (this.initPromise === tracked) this.initPromise = null;
       });
+      this.initPromise = tracked;
     }
     return this.initPromise;
   },
 
+  _assertUsable() {
+    if (this.invalidated) throw new Error('indexeddb connection invalidated; reload required');
+    if (!this.db && !this.fallbackAllowed) throw new Error('indexeddb connection unavailable');
+  },
+
   async open() {
+    if (this.invalidated) throw new Error('indexeddb connection invalidated; reload required');
     if (!window.indexedDB) return null;
+    if (this.db) { try { this.db.close(); } catch (e) { /* ignore */ } this.db = null; }
     try {
       this.db = await new Promise((resolve, reject) => {
-        const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+        let req;
+        let settled = false;
+        let timer = null;
+        const finish = (fn, value) => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          fn(value);
+        };
+        try { req = indexedDB.open(IDB_NAME, IDB_VERSION); }
+        catch (e) { finish(reject, e); return; }
+        timer = setTimeout(() => {
+          try { if (req.transaction) req.transaction.abort(); } catch (e) { /* ignore */ }
+          finish(reject, new Error('indexeddb open timed out'));
+        }, this.operationTimeoutMs);
         req.onupgradeneeded = () => {
+          if (settled) {
+            try { req.transaction.abort(); } catch (e) { /* ignore */ }
+            return;
+          }
           const db = req.result;
           if (!db.objectStoreNames.contains('kept')) db.createObjectStore('kept');
           if (!db.objectStoreNames.contains('marked')) db.createObjectStore('marked');
           if (!db.objectStoreNames.contains('log')) db.createObjectStore('log', { autoIncrement: true });
         };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-        req.onblocked = () => reject(new Error('indexeddb blocked'));
+        req.onsuccess = () => {
+          if (settled) { try { req.result.close(); } catch (e) { /* ignore */ } return; }
+          finish(resolve, req.result);
+        };
+        req.onerror = () => finish(reject, req.error || new Error('indexeddb open failed'));
+        req.onblocked = () => finish(reject, new Error('indexeddb blocked'));
       });
-      this.db.onversionchange = () => { try { this.db.close(); } catch (e) {} this.db = null; };
+      const openedDb = this.db;
+      openedDb.onversionchange = () => {
+        try { openedDb.close(); } catch (e) { /* ignore */ }
+        if (this.db !== openedDb) return;
+        this.db = null;
+        this.loaded = false;
+        this.epoch++;
+        this.invalidated = true;
+        this.stateWritable = false;
+        feed.ready = false;
+        Promise.resolve().then(() => {
+          if (typeof app !== 'undefined' && app.open) app.onStoreInvalidated();
+          else this.releaseLock();
+        });
+      };
     } catch (e) {
-      console.warn('[gpSwipe] IndexedDB unavailable, falling back to localStorage', e);
+      // If IndexedDB exists but cannot be read, falling back to an empty
+      // localStorage snapshot could re-offer photos whose decisions live only
+      // in IndexedDB. Fail closed and let the startup Retry dialog explain it.
+      console.warn('[gpSwipe] IndexedDB could not be opened safely', e);
       this.db = null;
+      throw e;
     }
     return this.db;
   },
 
-  tx(storeName, mode, fn) {
+  _tx(storeNames, mode, fn) {
     return new Promise((resolve, reject) => {
+      try { this._assertUsable(); } catch (e) { reject(e); return; }
+      const db = this.db;
+      const txEpoch = this.epoch;
+      let settled = false;
+      let timer = null;
       let req;
-      const tx = this.db.transaction(storeName, mode);
-      try { req = fn(tx.objectStore(storeName)); } catch (e) { reject(e); return; }
-      tx.oncomplete = () => resolve(req && 'result' in req ? req.result : undefined);
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      let tx;
+      const finish = (fn2, value) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        fn2(value);
+      };
+      try { tx = db.transaction(storeNames, mode); }
+      catch (e) { finish(reject, e); return; }
+      timer = setTimeout(() => {
+        try {
+          tx.abort();
+          finish(reject, new Error('indexeddb transaction timed out'));
+        } catch (e) {
+          // InvalidStateError can mean the transaction already committed and
+          // its completion task is merely queued. Give that authoritative
+          // event one short turn before treating the outcome as unknown.
+          timer = setTimeout(() => finish(reject, new Error('indexeddb transaction outcome unknown')), 250);
+        }
+      }, this.operationTimeoutMs);
+      try { req = fn(tx); }
+      catch (e) {
+        try { tx.abort(); } catch (abortError) { /* ignore */ }
+        finish(reject, e);
+        return;
+      }
+      tx.oncomplete = () => {
+        if (this.invalidated || this.epoch !== txEpoch || this.db !== db) {
+          finish(reject, new Error('indexeddb transaction became stale'));
+          return;
+        }
+        let result;
+        try { result = req && 'result' in req ? req.result : undefined; }
+        catch (e) { finish(reject, e); return; }
+        finish(resolve, result);
+      };
+      tx.onerror = () => finish(reject, tx.error || new Error('indexeddb transaction failed'));
+      tx.onabort = () => finish(reject, tx.error || new Error('indexeddb transaction aborted'));
     });
+  },
+
+  tx(storeName, mode, fn) {
+    return this._tx(storeName, mode, (tx) => fn(tx.objectStore(storeName)));
   },
 
   async load() {
@@ -1586,10 +1717,12 @@ const store = {
         try { localStorage.removeItem(lsKey); } catch (e) { /* ignore */ }
       }
     }
+    this._assertUsable();
     this.loaded = true;
   },
 
   async refresh() {
+    this._assertUsable();
     const nextKept = new Set();
     const nextMarked = new Map();
     const acceptMarked = (it) => {
@@ -1618,6 +1751,7 @@ const store = {
 
     // Swap only after every read succeeded. A partial snapshot must never be
     // exposed to the feed, because it could offer a pending-delete item again.
+    this._assertUsable();
     kept.clear();
     nextKept.forEach((k) => kept.add(k));
     marked.clear();
@@ -1631,6 +1765,10 @@ const store = {
     if (this.hasLock) return Promise.resolve(true);
     if (this.releasePromise) return this.releasePromise.then(() => this.acquireLock());
     if (this.lockAcquirePromise) return this.lockAcquirePromise;
+    if (this.lockAttempt && !this.lockAttempt.done) {
+      this.lockFailure = 'unavailable';
+      return Promise.resolve(false);
+    }
     this.lockFailure = null;
     const locks = this.lockApi;
     if (!locks || typeof locks.request !== 'function') {
@@ -1640,36 +1778,64 @@ const store = {
       return Promise.resolve(false);
     }
 
-    this.lockCancelRequested = false;
+    // Web Locks forbids combining `ifAvailable` with an AbortSignal. Keep the
+    // immediate, non-queued semantics and make late callbacks harmless with a
+    // request-local cancellation flag instead.
+    const attempt = { cancelled: false, timedOut: false, done: false, promise: null, release: null, timer: null };
+    this.lockAttempt = attempt;
     this.lockAcquirePromise = new Promise((resolve) => {
       let reported = false;
       const report = (value) => { if (!reported) { reported = true; resolve(value); } };
-      this.lockRequest = locks.request('gpSwipe-active-' + ACCT, { mode: 'exclusive', ifAvailable: true }, async (lock) => {
-        if (!lock) { this.lockCancelRequested = false; report(false); return; }
-        this.hasLock = true;
-        this.stateWritable = false;
-        report(true);
-        if (this.lockCancelRequested) {
-          this.hasLock = false;
-          this.lockCancelRequested = false;
-          return;
-        }
-        await new Promise((release) => { this.lockRelease = release; });
-        this.hasLock = false;
-        this.lockRelease = null;
-      }).catch((e) => {
-        if (this.lockCancelRequested) {
-          this.lockCancelRequested = false;
-          this.hasLock = false;
-          report(false);
-          return;
-        }
-        console.warn('[gpSwipe] Web Lock unavailable; blocking mutable state', e);
+      const unavailable = (e) => {
+        if (e && !attempt.cancelled) console.warn('[gpSwipe] Web Lock unavailable; blocking mutable state', e);
         this.hasLock = false;
         this.stateWritable = false;
         this.lockFailure = 'unavailable';
         report(false);
-      }).finally(() => { this.lockRequest = null; });
+      };
+      const options = { mode: 'exclusive', ifAvailable: true };
+      attempt.timer = setTimeout(() => {
+        attempt.cancelled = true;
+        attempt.timedOut = true;
+        unavailable(new Error('Web Lock request timed out'));
+      }, this.lockTimeoutMs);
+
+      let request;
+      try {
+        request = locks.request('gpSwipe-active-' + ACCT, options, async (lock) => {
+          if (attempt.timer) { clearTimeout(attempt.timer); attempt.timer = null; }
+          if (!lock) { report(false); return; }
+          if (attempt.cancelled || this.lockAttempt !== attempt) { report(false); return; }
+          this.hasLock = true;
+          this.stateWritable = false;
+          report(true);
+          await new Promise((release) => {
+            attempt.release = release;
+            this.lockRelease = release;
+            if (attempt.cancelled) release();
+          });
+          if (this.lockAttempt === attempt) {
+            this.hasLock = false;
+            this.lockRelease = null;
+          }
+        });
+      } catch (e) {
+        if (attempt.timer) { clearTimeout(attempt.timer); attempt.timer = null; }
+        attempt.done = true;
+        if (this.lockAttempt === attempt) this.lockAttempt = null;
+        unavailable(e);
+        return;
+      }
+      attempt.promise = Promise.resolve(request).catch((e) => {
+        if (!attempt.cancelled) unavailable(e);
+        else report(false);
+      }).finally(() => {
+        attempt.done = true;
+        if (attempt.timer) clearTimeout(attempt.timer);
+        if (this.lockRequest === attempt.promise) this.lockRequest = null;
+        if (this.lockAttempt === attempt && !this.hasLock) this.lockAttempt = null;
+      });
+      this.lockRequest = attempt.promise;
     }).finally(() => { this.lockAcquirePromise = null; });
     return this.lockAcquirePromise;
   },
@@ -1677,17 +1843,31 @@ const store = {
   releaseLock() {
     this.hasLock = false;
     this.stateWritable = false;
-    if (this.lockRelease) {
-      const release = this.lockRelease;
+    const attempt = this.lockAttempt;
+    if (attempt) attempt.cancelled = true;
+    if (attempt && attempt.release) {
+      const release = attempt.release;
+      attempt.release = null;
       this.lockRelease = null;
       release();
-    } else if (this.lockRequest) {
-      this.lockCancelRequested = true;
     }
     const pending = this.lockRequest;
     if (!pending) return Promise.resolve();
+    if (attempt && attempt.timedOut) {
+      if (this.lockAttempt === attempt) this.lockAttempt = null;
+      if (this.lockRequest === pending) this.lockRequest = null;
+      return Promise.resolve();
+    }
     let tracked;
-    tracked = Promise.resolve(pending).catch(() => {}).finally(() => {
+    tracked = Promise.race([
+      Promise.resolve(pending).catch(() => {}),
+      sleep(this.lockTimeoutMs),
+    ]).finally(() => {
+      if (attempt && !attempt.done) {
+        attempt.cancelled = true;
+        if (this.lockAttempt === attempt) this.lockAttempt = null;
+        if (this.lockRequest === pending) this.lockRequest = null;
+      }
       if (this.releasePromise === tracked) this.releasePromise = null;
     });
     this.releasePromise = tracked;
@@ -1701,21 +1881,25 @@ const store = {
   _warn(e) { console.warn('[gpSwipe] IndexedDB write failed', e); },
 
   keepAdd(key) {
+    this._assertUsable();
     kept.add(key);
     if (this.db) return this.tx('kept', 'readwrite', (st) => st.put(1, key)).catch(this._warn);
     return this._fallbackKept();
   },
   keepDel(key) {
+    this._assertUsable();
     kept.delete(key);
     if (this.db) return this.tx('kept', 'readwrite', (st) => st.delete(key)).catch(this._warn);
     return this._fallbackKept();
   },
   keepAddMany(keys) {
+    this._assertUsable();
     keys.forEach((k) => kept.add(k));
     if (this.db) return this.tx('kept', 'readwrite', (st) => keys.forEach((k) => st.put(1, k))).catch(this._warn);
     return this._fallbackKept();
   },
   async keepClear() {
+    this._assertUsable();
     if (this.db) {
       await this.tx('kept', 'readwrite', (st) => st.clear());
       kept.clear();
@@ -1734,21 +1918,25 @@ const store = {
   },
 
   markAdd(item) {
+    this._assertUsable();
     marked.set(item.mediaKey, item);
     if (this.db) return this.tx('marked', 'readwrite', (st) => st.put(item, item.mediaKey)).catch(this._warn);
     return this._fallbackMarked();
   },
   markDel(key) {
+    this._assertUsable();
     marked.delete(key);
     if (this.db) return this.tx('marked', 'readwrite', (st) => st.delete(key)).catch(this._warn);
     return this._fallbackMarked();
   },
   markDelMany(keys) {
+    this._assertUsable();
     keys.forEach((k) => marked.delete(k));
     if (this.db) return this.tx('marked', 'readwrite', (st) => keys.forEach((k) => st.delete(k))).catch(this._warn);
     return this._fallbackMarked();
   },
   markAddMany(items) {
+    this._assertUsable();
     items.forEach((it) => marked.set(it.mediaKey, it));
     if (this.db) return this.tx('marked', 'readwrite', (st) => items.forEach((it) => st.put(it, it.mediaKey))).catch(this._warn);
     return this._fallbackMarked();
@@ -1758,17 +1946,15 @@ const store = {
   // in-memory maps change only after IndexedDB commits; localStorage fallback
   // rolls both snapshots back if either write fails.
   async setDisposition(item, action) {
+    this._assertUsable();
     const key = item && item.mediaKey;
     if (!key || (action !== 'keep' && action !== 'mark')) throw new Error('invalid disposition');
     if (this.db) {
-      await new Promise((resolve, reject) => {
-        const tx = this.db.transaction(['kept', 'marked'], 'readwrite');
+      await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
         const keepStore = tx.objectStore('kept');
         const markStore = tx.objectStore('marked');
         if (action === 'keep') { keepStore.put(1, key); markStore.delete(key); }
         else { keepStore.delete(key); markStore.put(item, key); }
-        tx.oncomplete = resolve;
-        tx.onerror = tx.onabort = () => reject(tx.error || new Error('decision transaction failed'));
       });
       if (action === 'keep') { kept.add(key); marked.delete(key); }
       else { kept.delete(key); marked.set(key, item); }
@@ -1789,14 +1975,12 @@ const store = {
   },
 
   async clearDisposition(key) {
+    this._assertUsable();
     if (!key) throw new Error('invalid disposition key');
     if (this.db) {
-      await new Promise((resolve, reject) => {
-        const tx = this.db.transaction(['kept', 'marked'], 'readwrite');
+      await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
         tx.objectStore('kept').delete(key);
         tx.objectStore('marked').delete(key);
-        tx.oncomplete = resolve;
-        tx.onerror = tx.onabort = () => reject(tx.error || new Error('undo transaction failed'));
       });
       kept.delete(key);
       marked.delete(key);
@@ -1817,6 +2001,7 @@ const store = {
   },
 
   async unmarkMany(items) {
+    this._assertUsable();
     if (!items.length) return;
     const keys = items.map((it) => it.mediaKey);
     if (this.db) {
@@ -1836,6 +2021,7 @@ const store = {
   // spared must never remain in the delete queue because one of two separate
   // transactions failed halfway through.
   async saveReviewChoices(items) {
+    this._assertUsable();
     if (this.db) {
       await this.tx('marked', 'readwrite', (st) => items.forEach((it) => st.put(it, it.mediaKey)));
       items.forEach((it) => marked.set(it.mediaKey, it));
@@ -1850,16 +2036,14 @@ const store = {
   },
 
   async moveMarkedToKept(items) {
+    this._assertUsable();
     if (!items.length) return;
     const keys = items.map((it) => it.mediaKey);
     if (this.db) {
-      await new Promise((resolve, reject) => {
-        const tx = this.db.transaction(['kept', 'marked'], 'readwrite');
+      await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
         const keepStore = tx.objectStore('kept');
         const markStore = tx.objectStore('marked');
         keys.forEach((k) => { keepStore.put(1, k); markStore.delete(k); });
-        tx.oncomplete = resolve;
-        tx.onerror = tx.onabort = () => reject(tx.error || new Error('review decision transaction failed'));
       });
       keys.forEach((k) => { kept.add(k); marked.delete(k); });
       return;
@@ -1877,12 +2061,12 @@ const store = {
   },
 
   async commitTrashed(items) {
+    this._assertUsable();
     if (!items.length) return;
     const keys = items.map((it) => it.mediaKey);
     if (this.db) {
       const at = Date.now();
-      await new Promise((resolve, reject) => {
-        const tx = this.db.transaction(['marked', 'log'], 'readwrite');
+      await this._tx(['marked', 'log'], 'readwrite', (tx) => {
         const markStore = tx.objectStore('marked');
         const logStore = tx.objectStore('log');
         items.forEach((i) => {
@@ -1893,8 +2077,6 @@ const store = {
             deletedAt: at, dryRun: false,
           });
         });
-        tx.oncomplete = resolve;
-        tx.onerror = tx.onabort = () => reject(tx.error || new Error('trash commit transaction failed'));
       });
       keys.forEach((k) => marked.delete(k));
       return;
@@ -1907,6 +2089,7 @@ const store = {
   },
 
   async restoreMarked(items) {
+    this._assertUsable();
     if (!items.length) return;
     if (this.db) {
       await this.tx('marked', 'readwrite', (st) => items.forEach((it) => st.put(it, it.mediaKey)));
@@ -1924,6 +2107,7 @@ const store = {
   // append-only record of what was actually trashed, so a run can be reconciled
   // against Google's 60-day trash window
   logDeleted(items, dryRun) {
+    this._assertUsable();
     if (!this.db || !items.length) return;
     const at = Date.now();
     const rows = items.map((i) => ({
@@ -1934,10 +2118,10 @@ const store = {
     return this.tx('log', 'readwrite', (st) => rows.forEach((r) => st.add(r))).catch(this._warn);
   },
   logRemove(mediaKeys) {          // batch undo: drop the entries again
+    this._assertUsable();
     if (!this.db || !mediaKeys.length) return;
     const want = new Set(mediaKeys);
-    return new Promise((resolve) => {
-      const tx = this.db.transaction('log', 'readwrite');
+    return this._tx('log', 'readwrite', (tx) => {
       const st = tx.objectStore('log');
       const req = st.openCursor();
       req.onsuccess = () => {
@@ -1946,11 +2130,11 @@ const store = {
         if (cur.value && want.has(cur.value.mediaKey)) cur.delete();
         cur.continue();
       };
-      tx.oncomplete = () => resolve();
-      tx.onerror = tx.onabort = () => resolve();
-    });
+      return req;
+    }).catch(this._warn);
   },
   logAll() {
+    this._assertUsable();
     if (!this.db) return Promise.resolve([]);
     return this.tx('log', 'readonly', (st) => st.getAll()).then((r) => r || []).catch(() => []);
   },
@@ -1967,6 +2151,8 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 const QUEUE_TARGET = 12;   // keep this many decided-free items buffered
 const PAGE_SIZE = 200;
+const MAX_SCAN_PAGES = 40; // one bounded scan; continuing requires a user retry
+const MAX_SCAN_MS = 20000;
 
 const feed = {
   queue: [],
@@ -2030,8 +2216,11 @@ const feed = {
     const gen = this.gen;
     app.renderState();
     try {
-      let guard = 0;
-      while (this.queue.length < QUEUE_TARGET && !this.exhausted && guard++ < 40) {
+      let scannedPages = 0;
+      const scanStarted = performance.now();
+      while (this.queue.length < QUEUE_TARGET && !this.exhausted
+        && scannedPages < MAX_SCAN_PAGES && performance.now() - scanStarted < MAX_SCAN_MS) {
+        scannedPages++;
         const requestKey = this.nextPageId === undefined ? '__first__' : String(this.nextPageId);
         if (this.requestedPages.has(requestKey)) throw new Error('pagination token repeated: ' + requestKey);
         this.requestedPages.add(requestKey);
@@ -2050,6 +2239,13 @@ const feed = {
           throw e;
         }
         if (gen !== this.gen) return;  // a reset happened while we were waiting
+        const structurallyUsable = page.items.filter(validMarkedItem);
+        if (structurallyUsable.length !== page.rawItemCount) {
+          // The page was not consumed: a later Retry must be allowed to fetch
+          // the same token after a page reload or compatibility fix.
+          this.requestedPages.delete(requestKey);
+          throw new Error('library response contains no usable media rows');
+        }
         for (const it of page.items) {
           if (this.accept(it)) { this.queue.push(it); this.seen.add(it.mediaKey); }
         }
@@ -2059,6 +2255,12 @@ const feed = {
         // Google can return an empty intermediate page with a continuation
         // token.  Only the absence of that token proves the source is done.
         if (!page.nextPageId) this.exhausted = true;
+      }
+      // `finally -> onFeedChanged -> swipe.render -> feed.take()` used to call
+      // ensure() again immediately here, defeating the 40-page guard. Pause in
+      // a recoverable state instead; Retry continues from the retained token.
+      if (!this.exhausted && (scannedPages >= MAX_SCAN_PAGES || performance.now() - scanStarted >= MAX_SCAN_MS)) {
+        this.error = 'scan-paused';
       }
       this.loadInfo();
     } catch (e) {
@@ -3166,7 +3368,7 @@ const app = {
     this.renderState();                            // show a spinner while storage/lock settles
 
     let acquired = await store.acquireLock();
-    if (!acquired && this.open) {
+    if (!acquired && this.open && store.lockFailure !== 'unavailable') {
       // A different tab may have released the lock in the same click/task.
       // Give that hand-off one bounded turn before declaring the tab blocked.
       await sleep(80);
@@ -3179,6 +3381,7 @@ const app = {
     }
     if (!acquired) {
       this.hydrating = false;
+      this.renderState();
       const lockUnavailable = store.lockFailure === 'unavailable';
       this.dialog({
         title: t(lockUnavailable ? 'lockUnavailableTitle' : 'otherTabTitle'),
@@ -3201,13 +3404,17 @@ const app = {
       this.hydrating = false;
       store.releaseLock();
       if (!this.open) return false;
+      this.renderState();
+      const reloadRequired = store.invalidated;
       this.dialog({
         title: t('localLoadTitle'),
         dismissable: false,
         body: [h('p', { text: t('localLoadBody') })],
         actions: [
           { label: t('close'), onClick: () => this.close() },
-          { label: t('retry'), primary: true, onClick: () => { this.close(); setTimeout(() => this.show(), 0); } },
+          reloadRequired
+            ? { label: t('reloadPage'), primary: true, onClick: () => location.reload() }
+            : { label: t('retry'), primary: true, onClick: () => { this.close(); setTimeout(() => this.show(), 0); } },
         ],
       });
       return false;
@@ -3252,8 +3459,8 @@ const app = {
     }
     this.close();
   },
-  close() {
-    if (this.busy() && !this.hydrating) return;
+  close(force) {
+    if (this.busy() && !this.hydrating && !force) return;
     this.open = false;
     this.hydrating = false;
     swipe.stopVideos();
@@ -3265,6 +3472,26 @@ const app = {
     store.releaseLock();
     feed.ready = false;
     if (typeof onLauncherUpdate === 'function') onLauncherUpdate();
+  },
+
+  onStoreInvalidated() {
+    if (!this.open) { store.releaseLock(); return; }
+    this.hydrating = false;
+    feed.ready = false;
+    swipe.clearCards();
+    feed.reset();
+    history.length = 0;
+    store.releaseLock();
+    this.renderState();
+    this.dialog({
+      title: t('localLoadTitle'),
+      dismissable: false,
+      body: [h('p', { text: t('localLoadBody') })],
+      actions: [
+        { label: t('close'), onClick: () => this.close(true) },
+        { label: t('reloadPage'), primary: true, onClick: () => location.reload() },
+      ],
+    });
   },
 
   rebuildShell() {
@@ -3357,13 +3584,14 @@ const app = {
     const ph = swipe.stage.querySelector('.gps-center');
     if (ph) ph.remove();
     if (!swipe.top) {
-      if (!feed.ready || feed.loading) {
+      if (this.hydrating || (feed.ready && feed.loading)) {
         swipe.stage.appendChild(h('div', { class: 'gps-center' }, h('div', { class: 'gps-spin' }), h('div', { text: t('loading') })));
       } else if (feed.error) {
+        const scanPaused = feed.error === 'scan-paused';
         swipe.stage.appendChild(h('div', { class: 'gps-center' },
-          h('div', { class: 'ic' }, icon('warn')),
-          h('div', { class: 'big', text: t('errLoadTitle') }),
-          h('div', { text: t('errLoadSub') }),
+          h('div', { class: 'ic' }, icon(scanPaused ? 'search' : 'warn')),
+          h('div', { class: 'big', text: t(scanPaused ? 'scanPausedTitle' : 'errLoadTitle') }),
+          h('div', { text: t(scanPaused ? 'scanPausedSub' : 'errLoadSub') }),
           h('button', { class: 'gps-btn tonal', style: { marginTop: '8px' }, onclick: () => { feed.error = false; feed.ensure(); this.renderState(); } }, icon('undo', 18), h('span', { text: t('retry') })),
         ));
       } else if (feed.exhausted) {

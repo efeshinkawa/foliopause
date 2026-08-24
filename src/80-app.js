@@ -104,7 +104,7 @@ const app = {
     this.renderState();                            // show a spinner while storage/lock settles
 
     let acquired = await store.acquireLock();
-    if (!acquired && this.open) {
+    if (!acquired && this.open && store.lockFailure !== 'unavailable') {
       // A different tab may have released the lock in the same click/task.
       // Give that hand-off one bounded turn before declaring the tab blocked.
       await sleep(80);
@@ -117,6 +117,7 @@ const app = {
     }
     if (!acquired) {
       this.hydrating = false;
+      this.renderState();
       const lockUnavailable = store.lockFailure === 'unavailable';
       this.dialog({
         title: t(lockUnavailable ? 'lockUnavailableTitle' : 'otherTabTitle'),
@@ -139,13 +140,17 @@ const app = {
       this.hydrating = false;
       store.releaseLock();
       if (!this.open) return false;
+      this.renderState();
+      const reloadRequired = store.invalidated;
       this.dialog({
         title: t('localLoadTitle'),
         dismissable: false,
         body: [h('p', { text: t('localLoadBody') })],
         actions: [
           { label: t('close'), onClick: () => this.close() },
-          { label: t('retry'), primary: true, onClick: () => { this.close(); setTimeout(() => this.show(), 0); } },
+          reloadRequired
+            ? { label: t('reloadPage'), primary: true, onClick: () => location.reload() }
+            : { label: t('retry'), primary: true, onClick: () => { this.close(); setTimeout(() => this.show(), 0); } },
         ],
       });
       return false;
@@ -190,8 +195,8 @@ const app = {
     }
     this.close();
   },
-  close() {
-    if (this.busy() && !this.hydrating) return;
+  close(force) {
+    if (this.busy() && !this.hydrating && !force) return;
     this.open = false;
     this.hydrating = false;
     swipe.stopVideos();
@@ -203,6 +208,26 @@ const app = {
     store.releaseLock();
     feed.ready = false;
     if (typeof onLauncherUpdate === 'function') onLauncherUpdate();
+  },
+
+  onStoreInvalidated() {
+    if (!this.open) { store.releaseLock(); return; }
+    this.hydrating = false;
+    feed.ready = false;
+    swipe.clearCards();
+    feed.reset();
+    history.length = 0;
+    store.releaseLock();
+    this.renderState();
+    this.dialog({
+      title: t('localLoadTitle'),
+      dismissable: false,
+      body: [h('p', { text: t('localLoadBody') })],
+      actions: [
+        { label: t('close'), onClick: () => this.close(true) },
+        { label: t('reloadPage'), primary: true, onClick: () => location.reload() },
+      ],
+    });
   },
 
   rebuildShell() {
@@ -295,13 +320,14 @@ const app = {
     const ph = swipe.stage.querySelector('.gps-center');
     if (ph) ph.remove();
     if (!swipe.top) {
-      if (!feed.ready || feed.loading) {
+      if (this.hydrating || (feed.ready && feed.loading)) {
         swipe.stage.appendChild(h('div', { class: 'gps-center' }, h('div', { class: 'gps-spin' }), h('div', { text: t('loading') })));
       } else if (feed.error) {
+        const scanPaused = feed.error === 'scan-paused';
         swipe.stage.appendChild(h('div', { class: 'gps-center' },
-          h('div', { class: 'ic' }, icon('warn')),
-          h('div', { class: 'big', text: t('errLoadTitle') }),
-          h('div', { text: t('errLoadSub') }),
+          h('div', { class: 'ic' }, icon(scanPaused ? 'search' : 'warn')),
+          h('div', { class: 'big', text: t(scanPaused ? 'scanPausedTitle' : 'errLoadTitle') }),
+          h('div', { text: t(scanPaused ? 'scanPausedSub' : 'errLoadSub') }),
           h('button', { class: 'gps-btn tonal', style: { marginTop: '8px' }, onclick: () => { feed.error = false; feed.ensure(); this.renderState(); } }, icon('undo', 18), h('span', { text: t('retry') })),
         ));
       } else if (feed.exhausted) {

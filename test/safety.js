@@ -42,6 +42,91 @@
     S().app.close();
     check(await S().app.show(), 'app recovers after secure locking becomes available');
 
+    S().app.close();
+    if (S().store.releasePromise) await S().store.releasePromise;
+    S().store.lockApi = { request: () => { throw new Error('injected synchronous lock failure'); } };
+    const syncLockOpen = await S().app.show();
+    check(syncLockOpen === false && S().store.lockFailure === 'unavailable',
+      'a synchronous Web Lock failure settles fail-closed');
+    check(!S().app.hydrating && !document.querySelector('.gps-spin'),
+      'a synchronous Web Lock failure cannot leave the loading spinner behind');
+
+    S().app.close();
+    const originalLockTimeout = S().store.lockTimeoutMs;
+    S().store.lockTimeoutMs = 60;
+    S().store.lockApi = { request: () => new Promise(() => {}) };
+    const lockStarted = performance.now();
+    const timedLockOpen = await S().app.show();
+    check(timedLockOpen === false && S().store.lockFailure === 'unavailable',
+      'a Web Lock request whose callback never runs reaches a terminal state');
+    check(performance.now() - lockStarted < 500,
+      'the hung Web Lock is bounded instead of waiting forever');
+    check(!S().app.hydrating && !document.querySelector('.gps-spin'),
+      'the bounded Web Lock failure removes the loading spinner');
+    S().app.close();
+    await sleep(100);
+    S().store.lockTimeoutMs = originalLockTimeout;
+    S().store.lockApi = originalLockApi;
+
+    const originalDb = S().store.db;
+    const originalStoreTimeout = S().store.operationTimeoutMs;
+    S().store.operationTimeoutMs = 60;
+    S().store.db = {
+      transaction: () => ({
+        error: null,
+        abort: () => {},
+        objectStore: () => ({
+          getAllKeys: () => ({}), getAll: () => ({}), put: () => ({}), delete: () => ({}), add: () => ({}),
+        }),
+      }),
+    };
+    S().store.loaded = true;
+    const undecided = S().swipe.top.item;
+    let timedDecisionRejected = false;
+    try { await S().store.setDisposition(undecided, 'keep'); } catch (e) { timedDecisionRejected = true; }
+    check(timedDecisionRejected && !S().kept.has(undecided.mediaKey),
+      'multi-store decision writes are bounded and update memory only after commit');
+    const timedStoreOpen = await S().app.show();
+    check(timedStoreOpen === false && S().feed.ready === false,
+      'a hung IndexedDB read blocks the feed and settles safely');
+    check(!S().app.hydrating && !document.querySelector('.gps-spin'),
+      'a hung IndexedDB read cannot leave the loading spinner behind');
+    check(!!document.querySelector('.gps-scrim'),
+      'a bounded local-store failure offers the existing Retry/Close explanation');
+    S().app.close();
+    if (S().store.releasePromise) await S().store.releasePromise;
+    S().store.db = originalDb;
+    S().store.operationTimeoutMs = originalStoreTimeout;
+    check(await S().app.show(), 'app recovers after bounded startup failures');
+
+    check(await until(() => top(), 5000), 'a card is available before the version-change probe');
+    const staleCandidate = S().swipe.top.item;
+    const fallbackMarkedBefore = localStorage.getItem(M.STATE_KEY + '.marked');
+    const versionedDb = S().store.db;
+    versionedDb.onversionchange();
+    await sleep(30);
+    check(S().store.invalidated === true && S().store.loaded === false && S().store.stateWritable === false,
+      'an IndexedDB version change invalidates every writable shortcut');
+    check(S().feed.ready === false && !S().swipe.top && !S().swipe.back && S().history.length === 0,
+      'an IndexedDB version change removes actionable cards and stale undo history');
+    check(!!document.querySelector('.gps-scrim') && !document.querySelector('.gps-spin')
+      && document.querySelector('.gps-scrim').textContent.indexOf(S().locales.tr.reloadPage) !== -1,
+    'an IndexedDB version change requires a page reload instead of showing Loading');
+    let staleWriteRejected = false;
+    try { await S().store.setDisposition(staleCandidate, 'mark'); } catch (e) { staleWriteRejected = true; }
+    check(staleWriteRejected && !S().marked.has(staleCandidate.mediaKey)
+      && localStorage.getItem(M.STATE_KEY + '.marked') === fallbackMarkedBefore,
+    'stale async work cannot fall through to a localStorage decision after invalidation');
+    S().app.close(true);
+    if (S().store.releasePromise) await S().store.releasePromise;
+    const invalidatedReopen = await S().app.show();
+    check(invalidatedReopen === false && S().feed.ready === false,
+      'the invalidated page cannot start a second in-process storage session');
+    S().app.close(true);
+    if (S().store.releasePromise) await S().store.releasePromise;
+    S().store.invalidated = false; // test-only stand-in for the required full page reload
+    check(await S().app.show(), 'a fresh page can safely hydrate after the old connection closes');
+
     const stateBeforeHydrationRace = localStorage.getItem(M.STATE_KEY);
     S().app.close();
     const authoritativeState = JSON.parse(stateBeforeHydrationRace);

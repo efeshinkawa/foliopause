@@ -29,6 +29,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function rpc(rpcid, data, opts) {
   const retries = (opts && opts.retries) || 3;
+  const timeoutMs = (opts && opts.timeoutMs) || RPC_TIMEOUT_MS;
   if (!G.at || !G.sid || !G.bl) throw new Error('WIZ_global_data missing');
   const body = 'f.req=' + encodeURIComponent(JSON.stringify([[[rpcid, JSON.stringify(data), null, 'generic']]]))
              + '&at=' + encodeURIComponent(G.at) + '&';
@@ -40,7 +41,7 @@ async function rpc(rpcid, data, opts) {
   let lastErr;
   for (let attempt = 1; attempt <= retries; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), RPC_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -134,9 +135,22 @@ const api = {
   // source: 1 library, 2 archive, 3 both
   async listLibrary(o) {
     o = o || {};
-    const r = await rpc('lcxiM', [o.pageId || null, o.timestamp != null ? o.timestamp : null, o.pageSize || 200, null, 1, o.source || 1]);
+    // Listing is an interactive startup path: two bounded attempts keep a
+    // broken connection from looking like an endless loading screen. Retry in
+    // the UI remains available without weakening any destructive operation.
+    const r = await rpc(
+      'lcxiM',
+      [o.pageId || null, o.timestamp != null ? o.timestamp : null, o.pageSize || 200, null, 1, o.source || 1],
+      { retries: 2, timeoutMs: 8000 }
+    );
+    if (!Array.isArray(r) || !Array.isArray(r[0])) throw new Error('unexpected library response');
+    const rows = r[0];
     return {
-      items: ((r && r[0]) || []).map(parseItem).filter(Boolean),
+      items: rows.map(parseItem).filter(Boolean),
+      // Keep the pre-parse count so a future Google response-shape change is
+      // distinguishable from a legitimate empty page. Without this signal a
+      // malformed page can be paged through forever while the UI says Loading.
+      rawItemCount: rows.length,
       nextPageId: (r && r[1]) || null,
       lastItemTimestamp: r && r[2] != null && Number.isFinite(Number(r[2])) ? Number(r[2]) : null,
     };
