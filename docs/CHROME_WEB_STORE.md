@@ -9,12 +9,21 @@ or Google brand colors in listing artwork.
 
 **Store title**
 
-> FolioPause — Review Before Trash
+> FolioPause — Photo Review for Google Photos™
 
 **Short description**
 
-> An independent, local review tool for Google Photos. Swipe to mark or keep,
+> An independent, local review tool for Google Photos™. Swipe to mark or keep,
 > then confirm before anything moves to Trash.
+
+This matches the shipped `appDescription` in all five locales. Chrome's
+[branding guidelines](https://developer.chrome.com/docs/webstore/branding)
+permit referencing a Google product with "for", "for use with", or "compatible
+with" provided the trademark symbol is present and attribution is given; they
+forbid using a Google trademark *as* the extension or company name, and forbid
+using a Google mark (or a modified one) as the extension logo. FolioPause does
+neither. Keep the "for Google Photos™" text smaller than the FolioPause mark in
+any promotional artwork.
 
 **Single purpose**
 
@@ -72,7 +81,7 @@ GitHub Pages site or another stable HTTPS page before submission.
 - [ ] 1280×800 or 640×400 screenshots
 - [ ] 440×280 promotional image
 - [ ] Public privacy-policy URL
-- [ ] ZIP with `manifest.json` at the archive root
+- [x] ZIP with `manifest.json` at the archive root
 - [ ] Private trusted-tester review
 - [ ] Public listing review
 
@@ -83,6 +92,35 @@ and this placeholder:
 
 > `CHROME_WEB_STORE_URL`
 
+## Known non-IP risk: Google's Terms of Service
+
+This is the residual risk that trademark and copyright hygiene cannot remove,
+and it is worth stating plainly in the listing and README.
+
+FolioPause drives an **undocumented internal Google Photos RPC** (`lcxiM`,
+`XwAOJf`, `VrseUb`, `EWgK9e`) from the user's own signed-in, same-origin
+session. The [Google Terms of Service](https://policies.google.com/terms)
+prohibit "using automated means to access content from any of our services in
+violation of the machine-readable instructions on our web pages" and
+"bypassing our systems or protective measures", and allow Google to "suspend or
+terminate your access to the services or delete your Google Account" for a
+material or repeated breach.
+
+Points that materially distinguish FolioPause from the scraping cases Google
+has actually enforced against:
+
+- it reads only the signed-in user's **own** library, not content belonging to
+  others, so "scraping content that doesn't belong to you" does not apply;
+- it runs inside the user's own authenticated session at human interaction
+  rates, with no proxies, no credential sharing and no identity concealment;
+- every request is user-initiated, and deletion only moves items to Trash,
+  which Google retains for 60 days.
+
+What cannot be ruled out is that Google treats third-party use of an internal
+RPC as circumventing the intended interface. The exposure lands on the
+**end user's Google account**, not on the project's copyright position, so the
+listing and README should say so before a user installs.
+
 ## Official references
 
 - [Prepare an extension for the Chrome Web Store](https://developer.chrome.com/docs/webstore/prepare)
@@ -91,3 +129,6 @@ and this placeholder:
 - [Privacy disclosures](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy)
 - [Image requirements](https://developer.chrome.com/docs/webstore/images)
 - [Impersonation and intellectual-property policy](https://developer.chrome.com/docs/webstore/program-policies/impersonation-and-intellectual-property)
+- [Chrome Web Store branding guidelines](https://developer.chrome.com/docs/webstore/branding)
+- [Google brand permission request form](https://support.google.com/contact/brand_request_form)
+- [Google Terms of Service](https://policies.google.com/terms)
