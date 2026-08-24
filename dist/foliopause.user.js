@@ -1279,6 +1279,16 @@ function extOf(d) {
   return last && typeof last === 'object' && !Array.isArray(last) ? last : {};
 }
 
+// batchexecute serialises int64 fields as JSON strings, so a taken-date can
+// arrive as either a number or a numeric string. Normalise once here: every
+// consumer (resume cursor, mutation boundary, validMarkedItem) requires a real
+// number, and a non-numeric value must stay invalid rather than become 0.
+function numTs(raw) {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) return Number(raw);
+  return null;
+}
+
 function parseItem(d) {
   if (!Array.isArray(d) || !d[0]) return null;
   const ext = extOf(d);
@@ -1291,7 +1301,7 @@ function parseItem(d) {
     thumb: d[1] && d[1][0],
     w: (d[1] && d[1][1]) || 0,
     h: (d[1] && d[1][2]) || 0,
-    ts: d[2],
+    ts: numTs(d[2]),
     dedupKey: d[3],
     tz: typeof d[4] === 'number' ? d[4] : 0,
     created: d[5],
@@ -2240,13 +2250,20 @@ const feed = {
         }
         if (gen !== this.gen) return;  // a reset happened while we were waiting
         const structurallyUsable = page.items.filter(validMarkedItem);
-        if (structurallyUsable.length !== page.rawItemCount) {
+        // A live library page routinely carries rows this client does not
+        // model (padding rows, uploads with no thumbnail yet). Skipping those
+        // individually is normal. Only a page that returns rows yet yields
+        // nothing usable at all indicates the response shape changed; without
+        // that guard a malformed source can be paged forever behind Loading.
+        if (page.rawItemCount > 0 && structurallyUsable.length === 0) {
           // The page was not consumed: a later Retry must be allowed to fetch
           // the same token after a page reload or compatibility fix.
           this.requestedPages.delete(requestKey);
           throw new Error('library response contains no usable media rows');
         }
-        for (const it of page.items) {
+        // Only fully-formed rows may enter the queue: a queued item can be
+        // marked, persisted and later named in a trash request.
+        for (const it of structurallyUsable) {
           if (this.accept(it)) { this.queue.push(it); this.seen.add(it.mediaKey); }
         }
         if (typeof page.lastItemTimestamp === 'number') this.lastPageTs = page.lastItemTimestamp;

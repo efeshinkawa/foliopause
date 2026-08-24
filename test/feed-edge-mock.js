@@ -9,6 +9,11 @@
     tokens: [],
     validKey: window.__mock.items[0] && window.__mock.items[0][0],
     malformedKey: 'MALFORMED-MIXED-ROW',
+    // Rows Google mixes into a normal library page that this client does not
+    // model. They must be skipped, never treated as a broken response.
+    validKeys: window.__mock.items.map((row) => row[0]),
+    processingKey: 'UPLOAD-STILL-PROCESSING',
+    junkKeys: ['UNMODELLED-ROW-A', 'UNMODELLED-ROW-B'],
   };
 
   const response = (payload) => {
@@ -55,6 +60,40 @@
       if (probe.calls < 40) return response([[], String(probe.calls), null]);
       if (probe.calls === 40) return response([[valid], '40', String(valid[2])]);
       return response([[], null, null]);
+    }
+
+    if (scenario === 'realistic') {
+      // A realistic single page: three ordinary photos interleaved with rows
+      // this client cannot parse — a null padding row and an upload that has
+      // no thumbnail yet. Both are normal in a live library.
+      const rows = [
+        window.__mock.items[0],
+        null,
+        window.__mock.items[1],
+        [probe.processingKey, null, window.__mock.items[1][2] - 1, 'DK-PROCESSING'],
+        window.__mock.items[2],
+      ];
+      return response([rows, null, String(window.__mock.items[2][2])]);
+    }
+
+    if (scenario === 'string-ts') {
+      // batchexecute serialises int64 fields as JSON strings. The page-level
+      // timestamp is already handled that way, so a row timestamp can arrive
+      // as a string too. Cards must still be produced.
+      const rows = window.__mock.items.map((row) => {
+        const copy = row.slice();
+        copy[2] = String(row[2]);
+        return copy;
+      });
+      return response([rows, null, String(window.__mock.items[0][2])]);
+    }
+
+    if (scenario === 'no-usable') {
+      // A non-empty page in which nothing parses at all: the response shape
+      // really did change. This must fail fast instead of paging the whole
+      // library behind a Loading spinner.
+      const rows = [[probe.junkKeys[0], null, null, null], [probe.junkKeys[1], null, null, null]];
+      return response([rows, '1', null]);
     }
 
     throw new Error('unknown feed edge scenario: ' + scenario);

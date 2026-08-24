@@ -88,6 +88,16 @@ function extOf(d) {
   return last && typeof last === 'object' && !Array.isArray(last) ? last : {};
 }
 
+// batchexecute serialises int64 fields as JSON strings, so a taken-date can
+// arrive as either a number or a numeric string. Normalise once here: every
+// consumer (resume cursor, mutation boundary, validMarkedItem) requires a real
+// number, and a non-numeric value must stay invalid rather than become 0.
+function numTs(raw) {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) return Number(raw);
+  return null;
+}
+
 function parseItem(d) {
   if (!Array.isArray(d) || !d[0]) return null;
   const ext = extOf(d);
@@ -100,7 +110,7 @@ function parseItem(d) {
     thumb: d[1] && d[1][0],
     w: (d[1] && d[1][1]) || 0,
     h: (d[1] && d[1][2]) || 0,
-    ts: d[2],
+    ts: numTs(d[2]),
     dedupKey: d[3],
     tz: typeof d[4] === 'number' ? d[4] : 0,
     created: d[5],

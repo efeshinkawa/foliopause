@@ -95,13 +95,20 @@ const feed = {
         }
         if (gen !== this.gen) return;  // a reset happened while we were waiting
         const structurallyUsable = page.items.filter(validMarkedItem);
-        if (structurallyUsable.length !== page.rawItemCount) {
+        // A live library page routinely carries rows this client does not
+        // model (padding rows, uploads with no thumbnail yet). Skipping those
+        // individually is normal. Only a page that returns rows yet yields
+        // nothing usable at all indicates the response shape changed; without
+        // that guard a malformed source can be paged forever behind Loading.
+        if (page.rawItemCount > 0 && structurallyUsable.length === 0) {
           // The page was not consumed: a later Retry must be allowed to fetch
           // the same token after a page reload or compatibility fix.
           this.requestedPages.delete(requestKey);
           throw new Error('library response contains no usable media rows');
         }
-        for (const it of page.items) {
+        // Only fully-formed rows may enter the queue: a queued item can be
+        // marked, persisted and later named in a trash request.
+        for (const it of structurallyUsable) {
           if (this.accept(it)) { this.queue.push(it); this.seen.add(it.mediaKey); }
         }
         if (typeof page.lastItemTimestamp === 'number') this.lastPageTs = page.lastItemTimestamp;
