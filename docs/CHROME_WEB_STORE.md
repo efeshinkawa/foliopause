@@ -139,14 +139,14 @@ GitHub Pages site or another stable HTTPS page before submission.
 - [ ] Public privacy-policy URL
 - [x] ZIP with `manifest.json` at the archive root
 - [ ] Private trusted-tester review
-- [ ] Public listing review
+- [x] Public listing review
 
-## Installation-link placeholder
+## Installation link
 
-After approval, replace the Chrome Web Store notice in [`../README.md`](../README.md)
-and this placeholder:
+The listing is published. The install link is live in
+[`../README.md`](../README.md):
 
-> `CHROME_WEB_STORE_URL`
+> https://go.efeer.im/foliopauseextension
 
 ## Known non-IP risk: Google's Terms of Service
 

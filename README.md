@@ -6,6 +6,11 @@
 
 <p align="center"><strong>Swipe fast. Pause before Trash.</strong></p>
 
+<p align="center">
+  <a href="https://go.efeer.im/foliopauseextension"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-Install-4285F4?logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License"></a>
+</p>
+
 FolioPause is an independent, open-source review tool for cleaning up a Google
 Photos library with swipe gestures. Swipe left to mark a photo, swipe right to
 keep it, then review every selection before anything moves to Trash. A left
@@ -56,11 +61,10 @@ provided "as is", without warranty of any kind and without liability, under the
 
 ### Recommended: Chrome extension
 
-> [!IMPORTANT]
-> **Chrome Web Store: coming soon.** The approved installation link will be
-> added here.
+**[➜ Install FolioPause from the Chrome Web Store](https://go.efeer.im/foliopauseextension)**
 
-<!-- CHROME_WEB_STORE_LINK: replace the notice above with the approved URL. -->
+Works in Chrome, Brave, Edge, and other Chromium browsers that support the
+Chrome Web Store.
 
 After installation:
 
@@ -69,7 +73,7 @@ After installation:
 3. Start reviewing.
 
 <details>
-<summary><strong>Developer preview: load the unpacked extension</strong></summary>
+<summary><strong>Alternative: load the unpacked extension from source</strong></summary>
 
 1. Download or clone this repository.
 2. Open `chrome://extensions` in Chrome, Brave, or Edge.
