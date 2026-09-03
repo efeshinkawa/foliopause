@@ -264,6 +264,63 @@ const api = {
 
 // image / video URLs served by Google's own CDN for this session
 const imgUrl = (it, size) => it.thumb + '=w' + size + '-h' + size + '-k-no';
-const videoUrl = (it) => it.thumb + '=dv';
+
+// A media key is served as several video renditions. Which of them a given
+// account and page build answers for is undocumented, so instead of guessing
+// we ask the browser once per session: load metadata from each candidate in
+// order and keep the first that really decodes. `=dv` is the original file and
+// is the last resort, so a session where nothing else answers behaves exactly
+// as before. Nothing here leaves Google's own media hosts.
+const VIDEO_VARIANTS = ['=m22', '=m18', '=dv'];
+const VIDEO_FALLBACK = VIDEO_VARIANTS[VIDEO_VARIANTS.length - 1];
+const VIDEO_PROBE_MS = 6000;
+const videoUrl = (it, variant) => it.thumb + (variant || videoSource.variant || VIDEO_FALLBACK);
+
+const videoSource = {
+  variant: null,     // resolved rendition for this session
+  probing: null,
+
+  probe(url) {
+    return new Promise((resolve) => {
+      const el = document.createElement('video');
+      el.preload = 'metadata';
+      el.muted = true;
+      let settled = false;
+      const done = (ok) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { el.removeAttribute('src'); el.load(); } catch (e) {}
+        resolve(ok);
+      };
+      const timer = setTimeout(() => done(false), VIDEO_PROBE_MS);
+      el.addEventListener('loadedmetadata', () => done(el.videoWidth > 0 || el.duration > 0), { once: true });
+      el.addEventListener('error', () => done(false), { once: true });
+      el.src = url;
+    });
+  },
+
+  // Called as soon as a video reaches the top of the deck so the probe is
+  // already finished by the time the user actually presses play.
+  resolve(item) {
+    if (this.variant) return Promise.resolve(this.variant);
+    if (this.probing) return this.probing;
+    if (!item || typeof item.thumb !== 'string' || !item.thumb) return Promise.resolve(VIDEO_FALLBACK);
+    this.probing = (async () => {
+      for (const variant of VIDEO_VARIANTS) {
+        if (variant === VIDEO_FALLBACK) break;         // the fallback needs no probe
+        let ok = false;
+        try { ok = await this.probe(item.thumb + variant); } catch (e) { ok = false; }
+        if (ok) return variant;
+      }
+      return VIDEO_FALLBACK;
+    })().catch(() => VIDEO_FALLBACK).then((variant) => {
+      this.variant = variant;
+      this.probing = null;
+      return variant;
+    });
+    return this.probing;
+  },
+};
 const photoPageUrl = (it) => BASE + 'photo/' + it.mediaKey;
 const trashPageUrl = () => BASE + 'trash';

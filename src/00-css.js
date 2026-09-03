@@ -140,6 +140,18 @@ const CSS = `
 .gps-chip{height:26px;padding:0 10px;border-radius:13px;display:inline-flex;align-items:center;gap:5px;
   background:rgba(0,0,0,.55);backdrop-filter:blur(8px);color:#fff;font-size:12px;font-weight:500;letter-spacing:.2px}
 .gps-chip svg{width:14px;height:14px}
+.gps-chip.vid{background:rgba(118,103,245,.86);color:#fff}
+
+/* video affordance — a video must never read as a still photo */
+.gps-play{position:absolute;top:50%;left:50%;width:74px;height:74px;border-radius:37px;z-index:2;
+  display:grid;place-items:center;color:#fff;background:rgba(10,12,18,.5);backdrop-filter:blur(10px);
+  box-shadow:0 8px 26px rgba(0,0,0,.5),inset 0 0 0 1.5px rgba(255,255,255,.34);
+  transform:translate(-50%,-50%);
+  transition:opacity var(--d-s) var(--e-std),background var(--d-s) var(--e-std),transform var(--d-s) var(--e-std)}
+.gps-play svg{width:34px;height:34px;margin-left:4px}
+.gps-play svg path{fill:currentColor}
+.gps-play:hover{background:rgba(26,30,44,.76);transform:translate(-50%,-50%) scale(1.06)}
+.gps-card.playing .gps-play,.gps-light-box.playing .gps-play{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.82)}
 
 /* verdict stamps */
 .gps-stamp{position:absolute;top:24px;display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:14px;
@@ -206,6 +218,11 @@ const CSS = `
   background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;opacity:0;transition:opacity var(--d-s) var(--e-std)}
 .gps-tile .zoom svg{width:17px;height:17px}
 .gps-tile:hover .zoom{opacity:1}
+.gps-tile .tvid{position:absolute;right:8px;bottom:8px;z-index:1;display:inline-flex;align-items:center;gap:5px;
+  height:24px;padding:0 9px;border-radius:12px;background:rgba(0,0,0,.66);backdrop-filter:blur(6px);
+  color:#fff;font-size:11px;font-weight:600;pointer-events:none}
+.gps-tile .tvid svg{width:13px;height:13px}
+.gps-tile .tvid svg path{fill:currentColor}
 .gps-tile .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 10px 8px;font-size:11px;color:#fff;
   background:linear-gradient(transparent,rgba(0,0,0,.7));opacity:0;transition:opacity var(--d-s) var(--e-std);pointer-events:none}
 .gps-tile:hover .cap{opacity:1}
@@ -273,6 +290,7 @@ const CSS = `
 .gps-light-box{position:absolute;inset:0;background:#000;z-index:11;display:flex;flex-direction:column;animation:gps-fade var(--d-s) var(--e-std) both}
 .gps-light-box .im{flex:1 1 auto;position:relative;min-height:0}
 .gps-light-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.gps-light-box video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:1}
 
 /* ---------- snackbar ---------- */
 .gps-snacks{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;flex-direction:column-reverse;gap:8px;z-index:20;align-items:center;pointer-events:none}
@@ -321,6 +339,8 @@ const CSS = `
   .gps-key{display:none}
   .gps-tile{height:140px}
   .gps-tile .zoom,.gps-tile .cap{opacity:1}
+  .gps-play{width:60px;height:60px;border-radius:30px}
+  .gps-play svg{width:28px;height:28px}
   .gps-scroll{padding-left:8px;padding-right:8px}
   .gps-banner{flex-wrap:wrap;gap:8px}
   .gps-banner>span:not(.sp){flex:1 1 calc(100% - 36px)}

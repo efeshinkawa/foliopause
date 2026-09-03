@@ -14,6 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const ROOT_REAL = fs.realpathSync(ROOT);
+const PKG_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 const PAGE_TIMEOUT_MS = 120000;
 const CDP_TIMEOUT_MS = 15000;
 
@@ -438,8 +439,8 @@ function stopServer(server) {
     earlyExit.catch(() => {});
 
     const specs = [
-      { label: 'console-prod', path: '/test/production-console.html?n=12&page=6&every=0', minimum: 8 },
-      { label: 'userscript-prod', path: '/test/production-userscript.html?n=12&page=6&every=0', minimum: 8 },
+      { label: 'console-prod', path: '/test/production-console.html?n=12&page=6&every=0&version=' + PKG_VERSION, minimum: 8 },
+      { label: 'userscript-prod', path: '/test/production-userscript.html?n=12&page=6&every=0&version=' + PKG_VERSION, minimum: 8 },
       { label: 'behavior', path: '/test/harness.html?n=30&page=10&every=0', minimum: 120 },
       { label: 'safety', path: '/test/safety.html?n=80&page=10&every=0&emptyFirst=1', minimum: 62 },
       { label: 'feed-refill', path: '/test/feed-refill.html?n=0&page=10&every=0', minimum: 12 },

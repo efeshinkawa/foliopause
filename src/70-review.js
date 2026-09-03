@@ -108,6 +108,9 @@ const review = {
       const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' });
       img.src = imgUrl(it, 512);
       tile.appendChild(img);
+      if (it.isVideo) {
+        tile.appendChild(h('div', { class: 'tvid' }, icon('play'), it.duration ? h('span', { text: fmtDur(it.duration) }) : null));
+      }
       tile.appendChild(h('div', { class: 'mark' }, icon(on ? 'trash' : 'check')));
       tile.appendChild(h('span', { class: 'kchip', text: t('spared') }));
       tile.appendChild(h('button', {
@@ -243,12 +246,54 @@ const review = {
     );
     const prev = h('button', { class: 'gps-nav l', title: t('prev'), onclick: () => go(-1) }, icon('chevL'));
     const next = h('button', { class: 'gps-nav r', title: t('next'), onclick: () => go(1) }, icon('chevR'));
-    const box = h('div', { class: 'gps-light-box' }, bar, h('div', { class: 'im' }, img, prev, next));
+    const play = h('button', {
+      class: 'gps-play', hidden: true, title: t('playVideo') + ' (V)', 'aria-label': t('playVideo'),
+      onclick: (e) => { e.stopPropagation(); startVideo(); },
+    }, icon('play'));
+    const media = h('div', { class: 'im' }, img, play, prev, next);
+    const box = h('div', { class: 'gps-light-box' }, bar, media);
+
+    const stopVideo = () => {
+      const v = media.querySelector('video');
+      if (v) {
+        try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
+      }
+      box.classList.remove('playing');
+    };
+    const startVideo = async () => {
+      const it = all[idx];
+      if (!it || !it.isVideo || media.querySelector('video')) return;
+      box.classList.add('playing');
+      let variant = videoSource.variant;
+      if (!variant) {
+        app.snack(t('videoLoading'), { ms: 2000 });
+        variant = await videoSource.resolve(it);
+        if (!box.isConnected || all[idx] !== it) { box.classList.remove('playing'); return; }
+      }
+      const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
+      const fail = () => {
+        if (v._gone || !v.isConnected) return;
+        stopVideo();
+        app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
+      };
+      v.addEventListener('error', fail);
+      v.addEventListener('play', () => box.classList.add('playing'));
+      v.addEventListener('pause', () => box.classList.remove('playing'));
+      v.addEventListener('ended', () => box.classList.remove('playing'));
+      v.src = videoUrl(it, variant);
+      media.insertBefore(v, prev);
+      v.play().catch(() => {});
+    };
+
     const paint = () => {
       const it = all[idx];
       if (!it) { close(); return; }
+      stopVideo();
+      play.hidden = !it.isVideo;
       img.src = imgUrl(it, 1800);
-      cap.textContent = (idx + 1) + ' / ' + all.length + '  ·  ' + fmtDate(it, true) + (this.sizeOf(it) ? '  ·  ' + fmtBytes(this.sizeOf(it)) : '');
+      cap.textContent = (idx + 1) + ' / ' + all.length + '  ·  ' + fmtDate(it, true)
+        + (it.isVideo && it.duration ? '  ·  ' + fmtDur(it.duration) : '')
+        + (this.sizeOf(it) ? '  ·  ' + fmtBytes(this.sizeOf(it)) : '');
       const on = this.selected.has(it.mediaKey);
       clear(markBtn);
       markBtn.className = 'gps-btn ' + (on ? 'danger' : 'tonal');
@@ -258,11 +303,12 @@ const review = {
       next.disabled = idx === all.length - 1;
     };
     const go = (d) => { idx = Math.max(0, Math.min(all.length - 1, idx + d)); paint(); };
-    const close = () => { box.remove(); this.lightbox = null; };
+    const close = () => { stopVideo(); box.remove(); this.lightbox = null; };
     box._keys = (e) => {
       if (e.key === 'Escape') { close(); return true; }
       if (e.key === 'ArrowLeft') { go(-1); return true; }
       if (e.key === 'ArrowRight') { go(1); return true; }
+      if (e.key === 'v' || e.key === 'V') { startVideo(); return true; }
       if (e.key === ' ' || e.key === 'Enter') { this.toggle(all[idx].mediaKey).then(paint); return true; }
       return false;
     };

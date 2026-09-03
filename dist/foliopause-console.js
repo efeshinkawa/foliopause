@@ -1,6 +1,6 @@
 /*!
  * @license MIT
- * FolioPause v2.0.0 — console build
+ * FolioPause v2.1.0 — console build
  * Card-based review for photos.google.com. Swipe left to mark, right to keep;
  * nothing is deleted until you review and confirm, and deleting only moves
  * photos to Google's Trash (recoverable for 60 days).
@@ -13,7 +13,7 @@
 (function () {
   'use strict';
   if (window.__gpSwipe) { window.__gpSwipe.open(); return; }
-  const APP_VERSION = "2.0.0";
+  const APP_VERSION = "2.1.0";
   const GP_TEST_MODE = false;
 
 // ---------------------------------------------------------------------------
@@ -158,6 +158,18 @@ const CSS = `
 .gps-chip{height:26px;padding:0 10px;border-radius:13px;display:inline-flex;align-items:center;gap:5px;
   background:rgba(0,0,0,.55);backdrop-filter:blur(8px);color:#fff;font-size:12px;font-weight:500;letter-spacing:.2px}
 .gps-chip svg{width:14px;height:14px}
+.gps-chip.vid{background:rgba(118,103,245,.86);color:#fff}
+
+/* video affordance — a video must never read as a still photo */
+.gps-play{position:absolute;top:50%;left:50%;width:74px;height:74px;border-radius:37px;z-index:2;
+  display:grid;place-items:center;color:#fff;background:rgba(10,12,18,.5);backdrop-filter:blur(10px);
+  box-shadow:0 8px 26px rgba(0,0,0,.5),inset 0 0 0 1.5px rgba(255,255,255,.34);
+  transform:translate(-50%,-50%);
+  transition:opacity var(--d-s) var(--e-std),background var(--d-s) var(--e-std),transform var(--d-s) var(--e-std)}
+.gps-play svg{width:34px;height:34px;margin-left:4px}
+.gps-play svg path{fill:currentColor}
+.gps-play:hover{background:rgba(26,30,44,.76);transform:translate(-50%,-50%) scale(1.06)}
+.gps-card.playing .gps-play,.gps-light-box.playing .gps-play{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.82)}
 
 /* verdict stamps */
 .gps-stamp{position:absolute;top:24px;display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:14px;
@@ -224,6 +236,11 @@ const CSS = `
   background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;opacity:0;transition:opacity var(--d-s) var(--e-std)}
 .gps-tile .zoom svg{width:17px;height:17px}
 .gps-tile:hover .zoom{opacity:1}
+.gps-tile .tvid{position:absolute;right:8px;bottom:8px;z-index:1;display:inline-flex;align-items:center;gap:5px;
+  height:24px;padding:0 9px;border-radius:12px;background:rgba(0,0,0,.66);backdrop-filter:blur(6px);
+  color:#fff;font-size:11px;font-weight:600;pointer-events:none}
+.gps-tile .tvid svg{width:13px;height:13px}
+.gps-tile .tvid svg path{fill:currentColor}
 .gps-tile .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 10px 8px;font-size:11px;color:#fff;
   background:linear-gradient(transparent,rgba(0,0,0,.7));opacity:0;transition:opacity var(--d-s) var(--e-std);pointer-events:none}
 .gps-tile:hover .cap{opacity:1}
@@ -291,6 +308,7 @@ const CSS = `
 .gps-light-box{position:absolute;inset:0;background:#000;z-index:11;display:flex;flex-direction:column;animation:gps-fade var(--d-s) var(--e-std) both}
 .gps-light-box .im{flex:1 1 auto;position:relative;min-height:0}
 .gps-light-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.gps-light-box video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:1}
 
 /* ---------- snackbar ---------- */
 .gps-snacks{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;flex-direction:column-reverse;gap:8px;z-index:20;align-items:center;pointer-events:none}
@@ -339,6 +357,8 @@ const CSS = `
   .gps-key{display:none}
   .gps-tile{height:140px}
   .gps-tile .zoom,.gps-tile .cap{opacity:1}
+  .gps-play{width:60px;height:60px;border-radius:30px}
+  .gps-play svg{width:28px;height:28px}
   .gps-scroll{padding-left:8px;padding-right:8px}
   .gps-banner{flex-wrap:wrap;gap:8px}
   .gps-banner>span:not(.sp){flex:1 1 calc(100% - 36px)}
@@ -418,6 +438,7 @@ const STRINGS = {
     prev: 'Önceki', next: 'Sonraki',
     // card chips
     video: 'Video', live: 'Hareketli', fav: 'Favori', archived: 'Arşiv',
+    playVideo: 'Videoyu oynat',
     // states
     loading: 'Yükleniyor…',
     scanPausedTitle: 'Bu bölümde yeni fotoğraf bulunamadı',
@@ -546,6 +567,7 @@ const STRINGS = {
     stampDel: 'DELETE', stampKeep: 'KEEP',
     prev: 'Previous', next: 'Next',
     video: 'Video', live: 'Live', fav: 'Favorite', archived: 'Archived',
+    playVideo: 'Play video',
     loading: 'Loading…',
     scanPausedTitle: 'No new photos found in this section',
     scanPausedSub: 'A long range was scanned. Retry to continue from where FolioPause stopped.',
@@ -685,6 +707,7 @@ STRINGS.it = {
   stampDel: 'ELIMINA', stampKeep: 'CONSERVA',
   prev: 'Precedente', next: 'Successiva',
   video: 'Video', live: 'Foto in movimento', fav: 'Preferita', archived: 'Archiviata',
+  playVideo: 'Riproduci il video',
   loading: 'Caricamento…',
   scanPausedTitle: 'Nessuna nuova foto trovata in questa sezione',
   scanPausedSub: 'È stato analizzato un intervallo lungo. Riprova per continuare dal punto in cui FolioPause si è fermato.',
@@ -803,6 +826,7 @@ STRINGS.es = {
   stampDel: 'ELIMINAR', stampKeep: 'CONSERVAR',
   prev: 'Anterior', next: 'Siguiente',
   video: 'Vídeo', live: 'Foto en movimiento', fav: 'Favorita', archived: 'Archivada',
+  playVideo: 'Reproducir el vídeo',
   loading: 'Cargando…',
   scanPausedTitle: 'No se encontraron fotos nuevas en esta sección',
   scanPausedSub: 'Se analizó un intervalo largo. Reintenta para continuar desde donde se detuvo FolioPause.',
@@ -921,6 +945,7 @@ STRINGS.de = {
   stampDel: 'LÖSCHEN', stampKeep: 'BEHALTEN',
   prev: 'Zurück', next: 'Weiter',
   video: 'Video', live: 'Bewegungsfoto', fav: 'Favorit', archived: 'Archiviert',
+  playVideo: 'Video abspielen',
   loading: 'Wird geladen…',
   scanPausedTitle: 'In diesem Abschnitt wurden keine neuen Fotos gefunden',
   scanPausedSub: 'Ein langer Bereich wurde durchsucht. Versuche es erneut, um dort fortzufahren, wo FolioPause angehalten hat.',
@@ -1081,6 +1106,7 @@ const ICONS = {
   tune: ['M4 7h9', 'M17 7h3', 'M4 17h3', 'M11 17h9', 'M15 4.5v5', 'M7 14.5v5'],
   help: ['M12 3.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17z', 'M9.6 9.4a2.5 2.5 0 014.9.6c0 1.7-2.5 2-2.5 3.9', 'M12 17.2v.02'],
   play: ['M8.5 5.6l10 6.4-10 6.4z'],
+  pause: ['M9.7 5.2v13.6', 'M14.3 5.2v13.6'],
   star: ['M12 3.8l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9-5.3-2.9-5.3 2.9 1.1-5.9L3.5 10l5.9-.8z'],
   archive: ['M3.5 6.5h17v3h-17z', 'M5 9.5v9a1.5 1.5 0 001.5 1.5h11a1.5 1.5 0 001.5-1.5v-9', 'M10 13.5h4'],
   movie: ['M3.5 6.5h17v11a1.5 1.5 0 01-1.5 1.5H5a1.5 1.5 0 01-1.5-1.5z', 'M3.5 6.5L6 3.5', 'M9 6.5l2.5-3', 'M14 6.5l2.5-3', 'M10.2 10.6l4.6 2.4-4.6 2.4z'],
@@ -1444,7 +1470,64 @@ const api = {
 
 // image / video URLs served by Google's own CDN for this session
 const imgUrl = (it, size) => it.thumb + '=w' + size + '-h' + size + '-k-no';
-const videoUrl = (it) => it.thumb + '=dv';
+
+// A media key is served as several video renditions. Which of them a given
+// account and page build answers for is undocumented, so instead of guessing
+// we ask the browser once per session: load metadata from each candidate in
+// order and keep the first that really decodes. `=dv` is the original file and
+// is the last resort, so a session where nothing else answers behaves exactly
+// as before. Nothing here leaves Google's own media hosts.
+const VIDEO_VARIANTS = ['=m22', '=m18', '=dv'];
+const VIDEO_FALLBACK = VIDEO_VARIANTS[VIDEO_VARIANTS.length - 1];
+const VIDEO_PROBE_MS = 6000;
+const videoUrl = (it, variant) => it.thumb + (variant || videoSource.variant || VIDEO_FALLBACK);
+
+const videoSource = {
+  variant: null,     // resolved rendition for this session
+  probing: null,
+
+  probe(url) {
+    return new Promise((resolve) => {
+      const el = document.createElement('video');
+      el.preload = 'metadata';
+      el.muted = true;
+      let settled = false;
+      const done = (ok) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { el.removeAttribute('src'); el.load(); } catch (e) {}
+        resolve(ok);
+      };
+      const timer = setTimeout(() => done(false), VIDEO_PROBE_MS);
+      el.addEventListener('loadedmetadata', () => done(el.videoWidth > 0 || el.duration > 0), { once: true });
+      el.addEventListener('error', () => done(false), { once: true });
+      el.src = url;
+    });
+  },
+
+  // Called as soon as a video reaches the top of the deck so the probe is
+  // already finished by the time the user actually presses play.
+  resolve(item) {
+    if (this.variant) return Promise.resolve(this.variant);
+    if (this.probing) return this.probing;
+    if (!item || typeof item.thumb !== 'string' || !item.thumb) return Promise.resolve(VIDEO_FALLBACK);
+    this.probing = (async () => {
+      for (const variant of VIDEO_VARIANTS) {
+        if (variant === VIDEO_FALLBACK) break;         // the fallback needs no probe
+        let ok = false;
+        try { ok = await this.probe(item.thumb + variant); } catch (e) { ok = false; }
+        if (ok) return variant;
+      }
+      return VIDEO_FALLBACK;
+    })().catch(() => VIDEO_FALLBACK).then((variant) => {
+      this.variant = variant;
+      this.probing = null;
+      return variant;
+    });
+    return this.probing;
+  },
+};
 const photoPageUrl = (it) => BASE + 'photo/' + it.mediaKey;
 const trashPageUrl = () => BASE + 'trash';
 
@@ -2458,11 +2541,24 @@ const swipe = {
     card.appendChild(img);
 
     const chips = h('div', { class: 'gps-chips' });
-    if (item.isVideo) chips.appendChild(h('span', { class: 'gps-chip' }, icon('movie'), fmtDur(item.duration)));
+    if (item.isVideo) chips.appendChild(h('span', { class: 'gps-chip vid' }, icon('movie'), fmtDur(item.duration)));
     if (item.isLive) chips.appendChild(h('span', { class: 'gps-chip' }, icon('live'), t('live')));
     if (item.isFavorite) chips.appendChild(h('span', { class: 'gps-chip' }, icon('star'), t('fav')));
     if (item.archived) chips.appendChild(h('span', { class: 'gps-chip' }, icon('archive'), t('archived')));
     card.appendChild(chips);
+
+    if (item.isVideo) {
+      // Rendered as a single still frame a video is indistinguishable from a
+      // photo, so it gets a play control of its own instead of relying on the
+      // V shortcut nobody discovers.
+      card.appendChild(h('button', {
+        class: 'gps-play', 'data-act': 'play',
+        title: t('playVideo') + ' (V)', 'aria-label': t('playVideo'),
+        onclick: () => this.requestVideo(),
+        onmousedown: (e) => e.preventDefault(),
+      }, icon('play')));
+      if (!isBack) videoSource.resolve(item);   // warm the probe before the first press
+    }
 
     card.appendChild(h('div', { class: 'gps-stamp del' }, icon('trash'), t('stampDel')));
     card.appendChild(h('div', { class: 'gps-stamp keep' }, icon('check'), t('stampKeep')));
@@ -2537,7 +2633,7 @@ const swipe = {
     const el = cur.el, item = cur.item;
     this.top = null;
     if (el._cancelDrag) el._cancelDrag();
-    el.querySelectorAll('video').forEach((v) => { try { v.pause(); } catch (e) {} });
+    el.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
     el.classList.add('fly');
     const dist = this.stage.clientWidth * 0.9 + 420;
     el.style.transform = 'translate(' + dir * dist + 'px,' + (dy || 0) + 'px) rotate(' + dir * 22 + 'deg)';
@@ -2687,26 +2783,80 @@ const swipe = {
   },
 
   // ---- video -------------------------------------------------------------
-  toggleVideo() {
+  // One press can arrive as both a click on the overlay and a resolved tap
+  // from the drag handler below; the guard keeps it a single toggle.
+  lastVideoToggle: 0,
+  requestVideo() {
+    const now = performance.now();
+    if (now - this.lastVideoToggle < 260) return;
+    this.lastVideoToggle = now;
+    this.act('video');
+  },
+
+  async toggleVideo() {
     const cur = this.top;
     if (!cur || !cur.item.isVideo) return;
-    let v = cur.el.querySelector('video');
-    if (v) { if (v.paused) v.play().catch(() => {}); else v.pause(); return; }
-    v = h('video', { controls: true, playsinline: true, preload: 'auto' });
-    const fail = () => { if (!v.isConnected) return; v.remove(); app.snack(t('videoFail'), { kind: 'err', ms: 5000 }); };
-    const timer = setTimeout(() => { if (v.readyState === 0) fail(); }, 15000);
-    v.addEventListener('error', () => { clearTimeout(timer); fail(); });
-    v.addEventListener('loadedmetadata', () => clearTimeout(timer));
-    v.src = videoUrl(cur.item);
-    cur.el.insertBefore(v, cur.el.querySelector('.gps-chips'));
-    app.snack(t('videoLoading'), { ms: 2000 });
-    v.play().catch(() => {});
+    const existing = cur.el.querySelector('video');
+    if (existing) {
+      if (existing.paused) existing.play().catch(() => {});
+      else existing.pause();
+      return;
+    }
+    if (cur.el._videoPending) return;
+    let variant = videoSource.variant;
+    if (!variant) {
+      cur.el._videoPending = true;
+      cur.el.classList.add('playing');
+      app.snack(t('videoLoading'), { ms: 2000 });
+      try { variant = await videoSource.resolve(cur.item); }
+      finally { cur.el._videoPending = false; }
+      // the card may have been decided while the probe was running
+      if (this.top !== cur || !cur.el.isConnected) { cur.el.classList.remove('playing'); return; }
+    }
+    this.mountVideo(cur.el, cur.item, variant);
   },
+
+  mountVideo(card, item, variant) {
+    const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
+    const fail = () => {
+      if (v._gone || !v.isConnected) return;
+      clearTimeout(timer);
+      this.teardownVideo(v);
+      card.classList.remove('playing');
+      // A probed rendition can still be missing for one individual item; the
+      // original file is the last thing left to try.
+      if (variant !== VIDEO_FALLBACK) { videoSource.variant = VIDEO_FALLBACK; this.mountVideo(card, item, VIDEO_FALLBACK); return; }
+      app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
+    };
+    const timer = setTimeout(() => { if (v.readyState === 0) fail(); }, 15000);
+    v.addEventListener('error', fail);
+    v.addEventListener('loadedmetadata', () => clearTimeout(timer));
+    v.addEventListener('play', () => card.classList.add('playing'));
+    v.addEventListener('pause', () => card.classList.remove('playing'));
+    v.addEventListener('ended', () => card.classList.remove('playing'));
+    v.src = videoUrl(item, variant);
+    card.classList.add('playing');
+    card.insertBefore(v, card.querySelector('.gps-chips'));
+    v.play().catch(() => {});
+    return v;
+  },
+
+  // Detaching first, and flagging the element, keeps the teardown's own
+  // load() from being mistaken for a playback failure and remounting.
+  teardownVideo(v) {
+    try {
+      v._gone = true;
+      v.pause();
+      v.remove();
+      v.removeAttribute('src');
+      v.load();
+    } catch (e) {}
+  },
+
   stopVideos() {
     if (!this.stage) return;
-    this.stage.querySelectorAll('video').forEach((v) => {
-      try { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } catch (e) {}
-    });
+    this.stage.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
+    this.stage.querySelectorAll('.gps-card.playing').forEach((c) => c.classList.remove('playing'));
   },
 
   // ---- drag --------------------------------------------------------------
@@ -2743,7 +2893,8 @@ const swipe = {
       if (!this.top || this.top.el !== card) return;
       if (e.target.tagName === 'VIDEO') return;
       const now = performance.now();
-      drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0, id: e.pointerId, t: now, samples: [{ x: e.clientX, t: now }] };
+      const onPlay = !!(e.target instanceof Element && e.target.closest('.gps-play'));
+      drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0, id: e.pointerId, t: now, onPlay: onPlay, samples: [{ x: e.clientX, t: now }] };
       try { card.setPointerCapture(e.pointerId); } catch (err) {}
       card.classList.add('grab');
     });
@@ -2781,7 +2932,12 @@ const swipe = {
       const fling = Math.abs(d.dx) > 48 && elapsed > 40 && Math.abs(v) > 0.85 && Math.sign(v) === Math.sign(d.dx);
       if (d.dx < -th || (fling && d.dx < 0)) this.fly(-1, d.dy);
       else if (d.dx > th || (fling && d.dx > 0)) this.fly(1, d.dy);
-      else reset();
+      else {
+        reset();
+        // Pointer capture on the card retargets the click away from the play
+        // button, so a tap that never became a drag is resolved here.
+        if (d.onPlay && Math.abs(d.dx) < 8 && Math.abs(d.dy) < 8) this.requestVideo();
+      }
     };
     card.addEventListener('pointerup', end);
     card.addEventListener('pointercancel', end);
@@ -2898,6 +3054,9 @@ const review = {
       const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' });
       img.src = imgUrl(it, 512);
       tile.appendChild(img);
+      if (it.isVideo) {
+        tile.appendChild(h('div', { class: 'tvid' }, icon('play'), it.duration ? h('span', { text: fmtDur(it.duration) }) : null));
+      }
       tile.appendChild(h('div', { class: 'mark' }, icon(on ? 'trash' : 'check')));
       tile.appendChild(h('span', { class: 'kchip', text: t('spared') }));
       tile.appendChild(h('button', {
@@ -3033,12 +3192,54 @@ const review = {
     );
     const prev = h('button', { class: 'gps-nav l', title: t('prev'), onclick: () => go(-1) }, icon('chevL'));
     const next = h('button', { class: 'gps-nav r', title: t('next'), onclick: () => go(1) }, icon('chevR'));
-    const box = h('div', { class: 'gps-light-box' }, bar, h('div', { class: 'im' }, img, prev, next));
+    const play = h('button', {
+      class: 'gps-play', hidden: true, title: t('playVideo') + ' (V)', 'aria-label': t('playVideo'),
+      onclick: (e) => { e.stopPropagation(); startVideo(); },
+    }, icon('play'));
+    const media = h('div', { class: 'im' }, img, play, prev, next);
+    const box = h('div', { class: 'gps-light-box' }, bar, media);
+
+    const stopVideo = () => {
+      const v = media.querySelector('video');
+      if (v) {
+        try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
+      }
+      box.classList.remove('playing');
+    };
+    const startVideo = async () => {
+      const it = all[idx];
+      if (!it || !it.isVideo || media.querySelector('video')) return;
+      box.classList.add('playing');
+      let variant = videoSource.variant;
+      if (!variant) {
+        app.snack(t('videoLoading'), { ms: 2000 });
+        variant = await videoSource.resolve(it);
+        if (!box.isConnected || all[idx] !== it) { box.classList.remove('playing'); return; }
+      }
+      const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
+      const fail = () => {
+        if (v._gone || !v.isConnected) return;
+        stopVideo();
+        app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
+      };
+      v.addEventListener('error', fail);
+      v.addEventListener('play', () => box.classList.add('playing'));
+      v.addEventListener('pause', () => box.classList.remove('playing'));
+      v.addEventListener('ended', () => box.classList.remove('playing'));
+      v.src = videoUrl(it, variant);
+      media.insertBefore(v, prev);
+      v.play().catch(() => {});
+    };
+
     const paint = () => {
       const it = all[idx];
       if (!it) { close(); return; }
+      stopVideo();
+      play.hidden = !it.isVideo;
       img.src = imgUrl(it, 1800);
-      cap.textContent = (idx + 1) + ' / ' + all.length + '  ·  ' + fmtDate(it, true) + (this.sizeOf(it) ? '  ·  ' + fmtBytes(this.sizeOf(it)) : '');
+      cap.textContent = (idx + 1) + ' / ' + all.length + '  ·  ' + fmtDate(it, true)
+        + (it.isVideo && it.duration ? '  ·  ' + fmtDur(it.duration) : '')
+        + (this.sizeOf(it) ? '  ·  ' + fmtBytes(this.sizeOf(it)) : '');
       const on = this.selected.has(it.mediaKey);
       clear(markBtn);
       markBtn.className = 'gps-btn ' + (on ? 'danger' : 'tonal');
@@ -3048,11 +3249,12 @@ const review = {
       next.disabled = idx === all.length - 1;
     };
     const go = (d) => { idx = Math.max(0, Math.min(all.length - 1, idx + d)); paint(); };
-    const close = () => { box.remove(); this.lightbox = null; };
+    const close = () => { stopVideo(); box.remove(); this.lightbox = null; };
     box._keys = (e) => {
       if (e.key === 'Escape') { close(); return true; }
       if (e.key === 'ArrowLeft') { go(-1); return true; }
       if (e.key === 'ArrowRight') { go(1); return true; }
+      if (e.key === 'v' || e.key === 'V') { startVideo(); return true; }
       if (e.key === ' ' || e.key === 'Enter') { this.toggle(all[idx].mediaKey).then(paint); return true; }
       return false;
     };
@@ -3980,6 +4182,7 @@ const gpSwipePublic = {
 // into destructive test internals by setting a writable global.
 if (GP_TEST_MODE === true) Object.assign(gpSwipePublic, {
   app: app, swipe: swipe, review: review, feed: feed, api: api, store: store,
+  videoSource: videoSource,
   state: state, kept: kept, marked: marked, history: history, session: session,
   locales: STRINGS,
 });

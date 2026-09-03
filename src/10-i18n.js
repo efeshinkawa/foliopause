@@ -44,6 +44,7 @@ const STRINGS = {
     prev: 'Önceki', next: 'Sonraki',
     // card chips
     video: 'Video', live: 'Hareketli', fav: 'Favori', archived: 'Arşiv',
+    playVideo: 'Videoyu oynat',
     // states
     loading: 'Yükleniyor…',
     scanPausedTitle: 'Bu bölümde yeni fotoğraf bulunamadı',
@@ -172,6 +173,7 @@ const STRINGS = {
     stampDel: 'DELETE', stampKeep: 'KEEP',
     prev: 'Previous', next: 'Next',
     video: 'Video', live: 'Live', fav: 'Favorite', archived: 'Archived',
+    playVideo: 'Play video',
     loading: 'Loading…',
     scanPausedTitle: 'No new photos found in this section',
     scanPausedSub: 'A long range was scanned. Retry to continue from where FolioPause stopped.',

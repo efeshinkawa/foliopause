@@ -294,6 +294,71 @@
     check(new Set(offered).size === offered.length, 'no duplicates in the stack');
   });
 
+  // -------------------------------------------------------------- video ---
+  test('a video card is unmistakably a video and offers playback', async () => {
+    S().state.settings.reviewEvery = 0;          // no review prompt mid-test
+    S().app.showSwipe();
+    check(await until(() => !!S().swipe.top, 5000), 'the deck is showing');
+
+    const still = S().feed.queue.find((i) => !i.isVideo);
+    check(!!still && !S().swipe.makeCard(still, true).querySelector('.gps-play'), 'a photo card carries no play control');
+
+    const clip = S().feed.queue.find((i) => i.isVideo)
+      || [S().swipe.top, S().swipe.back].filter(Boolean).map((c) => c.item).find((i) => i.isVideo);
+    check(!!clip, 'the library still offers a video to test with');
+    if (!clip) return;
+    S().swipe.showOnTop(clip);
+    check(await until(() => S().swipe.top && S().swipe.top.item.mediaKey === clip.mediaKey, 2000), 'the video is on top');
+
+    const card = S().swipe.top.el;
+    const play = card.querySelector('.gps-play');
+    check(!!play, 'the video card has a play control of its own');
+    check(!!card.querySelector('.gps-chip.vid'), 'the running-time chip is flagged as a video');
+    check(/\d:\d\d/.test(card.querySelector('.gps-chip.vid').textContent), 'the chip shows a running time');
+    check(play && play.getAttribute('aria-label').length > 0, 'the play control is labelled for assistive tech');
+
+    // The mock serves an image where a video stream would be, so this also
+    // covers the failure path: probe every rendition, fall back to the
+    // original file, then give up once instead of remounting forever.
+    play.click();
+    check(await until(() => snacks().some((x) => /oynatılamadı|could not play/i.test(x)), 25000),
+      'an unplayable source is reported instead of failing silently');
+    check(S().videoSource.variant === '=dv', 'the probe settled on the original file, got ' + S().videoSource.variant);
+    await sleep(500);
+    check(card.querySelectorAll('video').length === 0, 'the dead <video> is torn down, not retried forever');
+    check(!card.classList.contains('playing'), 'the play control returns after a failure');
+  });
+
+  test('review badges videos and can play them from the preview', async () => {
+    S().app.showSwipe();
+    check(await until(() => S().swipe.top && S().swipe.top.item.isVideo, 3000), 'the video is still on the deck');
+    const clipKey = topKey();
+    await decide('ArrowLeft');
+    key('r');
+    check(await until(() => S().app.view === 'review', 2000), 'review opened');
+
+    const items = S().review.items();
+    const idx = items.findIndex((i) => i.mediaKey === clipKey);
+    check(idx !== -1, 'the video is waiting in review');
+    const badges = document.querySelectorAll('.gps-tile .tvid').length;
+    check(badges > 0 && badges === items.filter((i) => i.isVideo).length, 'every video tile is badged, got ' + badges);
+
+    tiles()[idx].querySelector('.zoom').click();
+    check(await until(() => !!S().review.lightbox, 2000), 'preview opened on the video');
+    const lbPlay = S().review.lightbox.querySelector('.gps-play');
+    check(!!lbPlay && !lbPlay.hidden, 'the preview offers playback for a video');
+    check(/\d:\d\d/.test(S().review.lightbox.querySelector('.gps-count').textContent), 'the caption carries the running time');
+    key('ArrowRight'); await sleep(120);
+    const after = S().review.items()[idx + 1];
+    check(!after || !after.isVideo === S().review.lightbox.querySelector('.gps-play').hidden, 'the play control follows what is on screen');
+    key('Escape'); await sleep(90);
+    check(!S().review.lightbox, 'preview closed');
+
+    S().app.showSwipe();
+    key('z');
+    check(await until(() => !S().marked.has(clipKey), 3000), 'undo takes the video back out of review');
+  });
+
   // ------------------------------------------------------------- chrome ----
   test('lightbox preview opens, navigates and toggles', async () => {
     key('r'); await until(() => S().app.view === 'review', 2000);

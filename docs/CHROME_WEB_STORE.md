@@ -41,6 +41,7 @@ WHAT IT DOES
 - Swipe, or use the arrow keys, to sort through a large library quickly
 - Undo any decision, one at a time or all at once
 - A review reminder every 100 photos, plus a Review button that is always available
+- Videos are clearly marked and play in place, so a clip is never judged from one frozen frame
 - Scoreboard showing reviewed, kept, pending and moved-to-trash counts
 - Dry Run mode to rehearse the whole flow without touching anything
 - Export a JSON log of every deletion

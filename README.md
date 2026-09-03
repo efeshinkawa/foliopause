@@ -136,6 +136,7 @@ internal list response does not provide a reliable library total.
 - Dry Run mode that never sends a Trash request
 - Local deletion-log export as JSON
 - Library, Archive, or combined source selection
+- Videos marked as videos everywhere, and playable in place before deciding
 - Optional video and favorite filters
 - Light, dark, and system themes
 - Keyboard, mouse, and touch controls

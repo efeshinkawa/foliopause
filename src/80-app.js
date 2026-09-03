@@ -710,6 +710,7 @@ const gpSwipePublic = {
 // into destructive test internals by setting a writable global.
 if (GP_TEST_MODE === true) Object.assign(gpSwipePublic, {
   app: app, swipe: swipe, review: review, feed: feed, api: api, store: store,
+  videoSource: videoSource,
   state: state, kept: kept, marked: marked, history: history, session: session,
   locales: STRINGS,
 });

@@ -110,11 +110,24 @@ const swipe = {
     card.appendChild(img);
 
     const chips = h('div', { class: 'gps-chips' });
-    if (item.isVideo) chips.appendChild(h('span', { class: 'gps-chip' }, icon('movie'), fmtDur(item.duration)));
+    if (item.isVideo) chips.appendChild(h('span', { class: 'gps-chip vid' }, icon('movie'), fmtDur(item.duration)));
     if (item.isLive) chips.appendChild(h('span', { class: 'gps-chip' }, icon('live'), t('live')));
     if (item.isFavorite) chips.appendChild(h('span', { class: 'gps-chip' }, icon('star'), t('fav')));
     if (item.archived) chips.appendChild(h('span', { class: 'gps-chip' }, icon('archive'), t('archived')));
     card.appendChild(chips);
+
+    if (item.isVideo) {
+      // Rendered as a single still frame a video is indistinguishable from a
+      // photo, so it gets a play control of its own instead of relying on the
+      // V shortcut nobody discovers.
+      card.appendChild(h('button', {
+        class: 'gps-play', 'data-act': 'play',
+        title: t('playVideo') + ' (V)', 'aria-label': t('playVideo'),
+        onclick: () => this.requestVideo(),
+        onmousedown: (e) => e.preventDefault(),
+      }, icon('play')));
+      if (!isBack) videoSource.resolve(item);   // warm the probe before the first press
+    }
 
     card.appendChild(h('div', { class: 'gps-stamp del' }, icon('trash'), t('stampDel')));
     card.appendChild(h('div', { class: 'gps-stamp keep' }, icon('check'), t('stampKeep')));
@@ -189,7 +202,7 @@ const swipe = {
     const el = cur.el, item = cur.item;
     this.top = null;
     if (el._cancelDrag) el._cancelDrag();
-    el.querySelectorAll('video').forEach((v) => { try { v.pause(); } catch (e) {} });
+    el.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
     el.classList.add('fly');
     const dist = this.stage.clientWidth * 0.9 + 420;
     el.style.transform = 'translate(' + dir * dist + 'px,' + (dy || 0) + 'px) rotate(' + dir * 22 + 'deg)';
@@ -339,26 +352,80 @@ const swipe = {
   },
 
   // ---- video -------------------------------------------------------------
-  toggleVideo() {
+  // One press can arrive as both a click on the overlay and a resolved tap
+  // from the drag handler below; the guard keeps it a single toggle.
+  lastVideoToggle: 0,
+  requestVideo() {
+    const now = performance.now();
+    if (now - this.lastVideoToggle < 260) return;
+    this.lastVideoToggle = now;
+    this.act('video');
+  },
+
+  async toggleVideo() {
     const cur = this.top;
     if (!cur || !cur.item.isVideo) return;
-    let v = cur.el.querySelector('video');
-    if (v) { if (v.paused) v.play().catch(() => {}); else v.pause(); return; }
-    v = h('video', { controls: true, playsinline: true, preload: 'auto' });
-    const fail = () => { if (!v.isConnected) return; v.remove(); app.snack(t('videoFail'), { kind: 'err', ms: 5000 }); };
-    const timer = setTimeout(() => { if (v.readyState === 0) fail(); }, 15000);
-    v.addEventListener('error', () => { clearTimeout(timer); fail(); });
-    v.addEventListener('loadedmetadata', () => clearTimeout(timer));
-    v.src = videoUrl(cur.item);
-    cur.el.insertBefore(v, cur.el.querySelector('.gps-chips'));
-    app.snack(t('videoLoading'), { ms: 2000 });
-    v.play().catch(() => {});
+    const existing = cur.el.querySelector('video');
+    if (existing) {
+      if (existing.paused) existing.play().catch(() => {});
+      else existing.pause();
+      return;
+    }
+    if (cur.el._videoPending) return;
+    let variant = videoSource.variant;
+    if (!variant) {
+      cur.el._videoPending = true;
+      cur.el.classList.add('playing');
+      app.snack(t('videoLoading'), { ms: 2000 });
+      try { variant = await videoSource.resolve(cur.item); }
+      finally { cur.el._videoPending = false; }
+      // the card may have been decided while the probe was running
+      if (this.top !== cur || !cur.el.isConnected) { cur.el.classList.remove('playing'); return; }
+    }
+    this.mountVideo(cur.el, cur.item, variant);
   },
+
+  mountVideo(card, item, variant) {
+    const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
+    const fail = () => {
+      if (v._gone || !v.isConnected) return;
+      clearTimeout(timer);
+      this.teardownVideo(v);
+      card.classList.remove('playing');
+      // A probed rendition can still be missing for one individual item; the
+      // original file is the last thing left to try.
+      if (variant !== VIDEO_FALLBACK) { videoSource.variant = VIDEO_FALLBACK; this.mountVideo(card, item, VIDEO_FALLBACK); return; }
+      app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
+    };
+    const timer = setTimeout(() => { if (v.readyState === 0) fail(); }, 15000);
+    v.addEventListener('error', fail);
+    v.addEventListener('loadedmetadata', () => clearTimeout(timer));
+    v.addEventListener('play', () => card.classList.add('playing'));
+    v.addEventListener('pause', () => card.classList.remove('playing'));
+    v.addEventListener('ended', () => card.classList.remove('playing'));
+    v.src = videoUrl(item, variant);
+    card.classList.add('playing');
+    card.insertBefore(v, card.querySelector('.gps-chips'));
+    v.play().catch(() => {});
+    return v;
+  },
+
+  // Detaching first, and flagging the element, keeps the teardown's own
+  // load() from being mistaken for a playback failure and remounting.
+  teardownVideo(v) {
+    try {
+      v._gone = true;
+      v.pause();
+      v.remove();
+      v.removeAttribute('src');
+      v.load();
+    } catch (e) {}
+  },
+
   stopVideos() {
     if (!this.stage) return;
-    this.stage.querySelectorAll('video').forEach((v) => {
-      try { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } catch (e) {}
-    });
+    this.stage.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
+    this.stage.querySelectorAll('.gps-card.playing').forEach((c) => c.classList.remove('playing'));
   },
 
   // ---- drag --------------------------------------------------------------
@@ -395,7 +462,8 @@ const swipe = {
       if (!this.top || this.top.el !== card) return;
       if (e.target.tagName === 'VIDEO') return;
       const now = performance.now();
-      drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0, id: e.pointerId, t: now, samples: [{ x: e.clientX, t: now }] };
+      const onPlay = !!(e.target instanceof Element && e.target.closest('.gps-play'));
+      drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0, id: e.pointerId, t: now, onPlay: onPlay, samples: [{ x: e.clientX, t: now }] };
       try { card.setPointerCapture(e.pointerId); } catch (err) {}
       card.classList.add('grab');
     });
@@ -433,7 +501,12 @@ const swipe = {
       const fling = Math.abs(d.dx) > 48 && elapsed > 40 && Math.abs(v) > 0.85 && Math.sign(v) === Math.sign(d.dx);
       if (d.dx < -th || (fling && d.dx < 0)) this.fly(-1, d.dy);
       else if (d.dx > th || (fling && d.dx > 0)) this.fly(1, d.dy);
-      else reset();
+      else {
+        reset();
+        // Pointer capture on the card retargets the click away from the play
+        // button, so a tap that never became a drag is resolved here.
+        if (d.onPlay && Math.abs(d.dx) < 8 && Math.abs(d.dy) < 8) this.requestVideo();
+      }
     };
     card.addEventListener('pointerup', end);
     card.addEventListener('pointercancel', end);

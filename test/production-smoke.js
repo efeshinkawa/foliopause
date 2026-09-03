@@ -19,7 +19,11 @@
     check(await until(() => window.__gpSwipe, 8000), kind + ' exported a public handle');
     const keys = Object.keys(window.__gpSwipe || {}).sort();
     check(JSON.stringify(keys) === JSON.stringify(['close', 'open', 'version']), kind + ' exposes only open/close/version');
-    check(window.__gpSwipe && window.__gpSwipe.version === '2.0.0', kind + ' runtime version matches the package');
+    // The runner passes the packaged version in, so a release bump can never
+    // leave this smoke test asserting a stale number.
+    const expectedVersion = new URLSearchParams(location.search).get('version');
+    check(window.__gpSwipe && window.__gpSwipe.version === expectedVersion,
+      kind + ' runtime version matches the package (' + (window.__gpSwipe && window.__gpSwipe.version) + ' vs ' + expectedVersion + ')');
 
     if (kind === 'userscript') {
       check(await until(() => document.querySelector('#gps-fab'), 4000), 'userscript mounted the FolioPause launcher');
