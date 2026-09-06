@@ -265,62 +265,112 @@ const api = {
 // image / video URLs served by Google's own CDN for this session
 const imgUrl = (it, size) => it.thumb + '=w' + size + '-h' + size + '-k-no';
 
-// A media key is served as several video renditions. Which of them a given
-// account and page build answers for is undocumented, so instead of guessing
-// we ask the browser once per session: load metadata from each candidate in
-// order and keep the first that really decodes. `=dv` is the original file and
-// is the last resort, so a session where nothing else answers behaves exactly
-// as before. Nothing here leaves Google's own media hosts.
-const VIDEO_VARIANTS = ['=m22', '=m18', '=dv'];
-const VIDEO_FALLBACK = VIDEO_VARIANTS[VIDEO_VARIANTS.length - 1];
-const VIDEO_PROBE_MS = 6000;
-const videoUrl = (it, variant) => it.thumb + (variant || videoSource.variant || VIDEO_FALLBACK);
+// A media key is served as several renditions, and which of them answers is
+// undocumented and varies per item. Measured against a real library:
+//   =m18  transcoded, range-seekable, answered for every item tested
+//         (1.8-8.3s to metadata)
+//   =dv   the untranscoded original; always answered, and fastest to first
+//         metadata (0.7-1.3s), but served whole rather than by range
+//   =m22  answered for one item in three — the rest return an image/png error
+//         page — and needed ~9.5s when it did exist, so it is not worth a turn
+// So there is nothing to guess up front: mount the first candidate straight
+// away and move down the list only if it errors or never speaks. The earlier
+// build probed the renditions before mounting anything, which cost the user up
+// to twelve seconds of a dead card before playback could even begin.
+// Nothing here leaves Google's own media hosts.
+const VIDEO_VARIANTS = ['=m18', '=dv'];
+const VIDEO_STALL_MS = 3500;    // silent this long: the rendition is not coming
+const VIDEO_LAST_MS = 12000;    // the final candidate is given room before we give up
+const videoUrl = (it, variant) => it.thumb + variant;
 
+// The item list comes from Google, but a media URL is the one value here that
+// the browser fetches on its own, so it is worth proving rather than trusting:
+// a base that ever pointed elsewhere would turn a play press into a request to
+// a third party. The stated guarantee is that nothing leaves Google's own
+// hosts, so enforce exactly that.
+function googleMediaBase(url) {
+  if (typeof url !== 'string' || !url || url.length > 16384) return false;
+  let u;
+  try { u = new URL(url, location.href); } catch (e) { return false; }
+  if (u.origin === location.origin) return true;   // the host page's own server
+  return u.protocol === 'https:'
+    && (u.hostname === 'googleusercontent.com' || u.hostname.endsWith('.googleusercontent.com')
+      || u.hostname === 'google.com' || u.hostname.endsWith('.google.com'));
+}
+
+// Which rendition answered last time, as a hint only: every item still walks
+// the whole list, so one awkward video cannot pin the rest of the session to a
+// worse source.
 const videoSource = {
-  variant: null,     // resolved rendition for this session
-  probing: null,
-
-  probe(url) {
-    return new Promise((resolve) => {
-      const el = document.createElement('video');
-      el.preload = 'metadata';
-      el.muted = true;
-      let settled = false;
-      const done = (ok) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        try { el.removeAttribute('src'); el.load(); } catch (e) {}
-        resolve(ok);
-      };
-      const timer = setTimeout(() => done(false), VIDEO_PROBE_MS);
-      el.addEventListener('loadedmetadata', () => done(el.videoWidth > 0 || el.duration > 0), { once: true });
-      el.addEventListener('error', () => done(false), { once: true });
-      el.src = url;
-    });
+  variant: null,
+  order() {
+    if (!this.variant) return VIDEO_VARIANTS.slice();
+    return [this.variant].concat(VIDEO_VARIANTS.filter((v) => v !== this.variant));
   },
-
-  // Called as soon as a video reaches the top of the deck so the probe is
-  // already finished by the time the user actually presses play.
-  resolve(item) {
-    if (this.variant) return Promise.resolve(this.variant);
-    if (this.probing) return this.probing;
-    if (!item || typeof item.thumb !== 'string' || !item.thumb) return Promise.resolve(VIDEO_FALLBACK);
-    this.probing = (async () => {
-      for (const variant of VIDEO_VARIANTS) {
-        if (variant === VIDEO_FALLBACK) break;         // the fallback needs no probe
-        let ok = false;
-        try { ok = await this.probe(item.thumb + variant); } catch (e) { ok = false; }
-        if (ok) return variant;
-      }
-      return VIDEO_FALLBACK;
-    })().catch(() => VIDEO_FALLBACK).then((variant) => {
-      this.variant = variant;
-      this.probing = null;
-      return variant;
-    });
-    return this.probing;
-  },
+  remember(variant) { if (VIDEO_VARIANTS.indexOf(variant) !== -1) this.variant = variant; },
 };
+
+// ---------------------------------------------------------------------------
+// Playback, shared by the swipe card and the review lightbox.
+//
+// `onState` is called with 'loading' | 'playing' | 'paused' | 'failed' so each
+// surface paints its own affordance; the walk between renditions is invisible
+// to it. The controller is parked on the host element so a teardown from
+// anywhere (a decision, a close, a second press) can cancel a walk in flight
+// instead of racing it.
+// ---------------------------------------------------------------------------
+function stopVideoIn(host) {
+  if (!host) return;
+  if (host._fpPlayer) { const p = host._fpPlayer; host._fpPlayer = null; p.stop(); }
+  host.querySelectorAll('video').forEach((v) => {
+    try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
+  });
+}
+
+function playVideoIn(host, item, before, onState) {
+  stopVideoIn(host);
+  if (!item || !googleMediaBase(item.thumb)) { try { onState('failed'); } catch (e) {} return null; }
+  const order = videoSource.order();
+  let idx = 0, el = null, timer = null, done = false;
+  const state = (s) => { try { onState(s); } catch (e) {} };
+  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const drop = () => {
+    clear();
+    if (!el) return;
+    const v = el; el = null;
+    try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
+  };
+  const stop = () => { done = true; drop(); };
+
+  const next = () => {
+    drop();
+    if (done) return;
+    if (idx >= order.length) { done = true; if (host._fpPlayer === ctl) host._fpPlayer = null; state('failed'); return; }
+    const variant = order[idx++];
+    const last = idx >= order.length;
+    const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
+    el = v;
+    // A rendition Google does not serve for this item errors within a few
+    // hundred ms; one it will never serve simply stays silent, so silence
+    // needs its own deadline.
+    const advance = () => { if (v._gone || done) return; next(); };
+    timer = setTimeout(advance, last ? VIDEO_LAST_MS : VIDEO_STALL_MS);
+    v.addEventListener('error', advance);
+    v.addEventListener('loadedmetadata', () => { clear(); videoSource.remember(variant); }, { once: true });
+    v.addEventListener('playing', () => state('playing'));
+    v.addEventListener('pause', () => state('paused'));
+    v.addEventListener('ended', () => state('paused'));
+    v.src = videoUrl(item, variant);
+    host.insertBefore(v, before || null);
+    v.play().catch(() => {});
+  };
+
+  const ctl = { stop: stop, el: () => el };
+  host._fpPlayer = ctl;
+  state('loading');
+  next();
+  return ctl;
+}
+
 const photoPageUrl = (it) => BASE + 'photo/' + it.mediaKey;
 const trashPageUrl = () => BASE + 'trash';

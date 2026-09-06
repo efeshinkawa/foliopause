@@ -8,6 +8,9 @@
 // ---------------------------------------------------------------------------
 
 const HISTORY_MAX = 500;
+// How far a pointer may wander and still count as a press rather than a drag.
+// A mouse click drifts a pixel or two; a touch commonly drifts fifteen.
+const TAP_SLOP = 24;
 const history = [];                 // swipe decisions + confirmed trash batches
 const session = { kept: 0, marked: 0, deleted: 0 };
 
@@ -126,7 +129,11 @@ const swipe = {
         onclick: () => this.requestVideo(),
         onmousedown: (e) => e.preventDefault(),
       }, icon('play')));
-      if (!isBack) videoSource.resolve(item);   // warm the probe before the first press
+      // Fetching the first frame can take a few seconds. Without a marker of
+      // its own the card sits on a frozen still with the play control already
+      // hidden, which reads as a dead press.
+      card.appendChild(h('div', { class: 'gps-vload', role: 'status', 'aria-label': t('videoLoading') },
+        h('div', { class: 'gps-spin' })));
     }
 
     card.appendChild(h('div', { class: 'gps-stamp del' }, icon('trash'), t('stampDel')));
@@ -202,7 +209,7 @@ const swipe = {
     const el = cur.el, item = cur.item;
     this.top = null;
     if (el._cancelDrag) el._cancelDrag();
-    el.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
+    stopVideoIn(el);
     el.classList.add('fly');
     const dist = this.stage.clientWidth * 0.9 + 420;
     el.style.transform = 'translate(' + dir * dist + 'px,' + (dy || 0) + 'px) rotate(' + dir * 22 + 'deg)';
@@ -352,8 +359,9 @@ const swipe = {
   },
 
   // ---- video -------------------------------------------------------------
-  // One press can arrive as both a click on the overlay and a resolved tap
-  // from the drag handler below; the guard keeps it a single toggle.
+  // A press can arrive as the button's own click (keyboard, assistive tech) or
+  // as a tap resolved by the drag handler below, so the guard keeps it a single
+  // toggle.
   lastVideoToggle: 0,
   requestVideo() {
     const now = performance.now();
@@ -362,70 +370,40 @@ const swipe = {
     this.act('video');
   },
 
-  async toggleVideo() {
+  toggleVideo() {
     const cur = this.top;
     if (!cur || !cur.item.isVideo) return;
+    // A second press while a source is still being resolved is a cancel; the
+    // card must never be a place the user cannot get out of.
+    if (cur.el.classList.contains('loading')) { this.stopVideo(cur.el); return; }
     const existing = cur.el.querySelector('video');
     if (existing) {
       if (existing.paused) existing.play().catch(() => {});
       else existing.pause();
       return;
     }
-    if (cur.el._videoPending) return;
-    let variant = videoSource.variant;
-    if (!variant) {
-      cur.el._videoPending = true;
-      cur.el.classList.add('playing');
-      app.snack(t('videoLoading'), { ms: 2000 });
-      try { variant = await videoSource.resolve(cur.item); }
-      finally { cur.el._videoPending = false; }
-      // the card may have been decided while the probe was running
-      if (this.top !== cur || !cur.el.isConnected) { cur.el.classList.remove('playing'); return; }
-    }
-    this.mountVideo(cur.el, cur.item, variant);
+    this.mountVideo(cur.el, cur.item);
   },
 
-  mountVideo(card, item, variant) {
-    const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
-    const fail = () => {
-      if (v._gone || !v.isConnected) return;
-      clearTimeout(timer);
-      this.teardownVideo(v);
-      card.classList.remove('playing');
-      // A probed rendition can still be missing for one individual item; the
-      // original file is the last thing left to try.
-      if (variant !== VIDEO_FALLBACK) { videoSource.variant = VIDEO_FALLBACK; this.mountVideo(card, item, VIDEO_FALLBACK); return; }
+  mountVideo(card, item) {
+    return playVideoIn(card, item, card.querySelector('.gps-chips'), (state) => {
+      card.classList.toggle('loading', state === 'loading');
+      card.classList.toggle('playing', state === 'loading' || state === 'playing');
+      if (state !== 'failed') return;
+      this.stopVideo(card);
       app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
-    };
-    const timer = setTimeout(() => { if (v.readyState === 0) fail(); }, 15000);
-    v.addEventListener('error', fail);
-    v.addEventListener('loadedmetadata', () => clearTimeout(timer));
-    v.addEventListener('play', () => card.classList.add('playing'));
-    v.addEventListener('pause', () => card.classList.remove('playing'));
-    v.addEventListener('ended', () => card.classList.remove('playing'));
-    v.src = videoUrl(item, variant);
-    card.classList.add('playing');
-    card.insertBefore(v, card.querySelector('.gps-chips'));
-    v.play().catch(() => {});
-    return v;
+    });
   },
 
-  // Detaching first, and flagging the element, keeps the teardown's own
-  // load() from being mistaken for a playback failure and remounting.
-  teardownVideo(v) {
-    try {
-      v._gone = true;
-      v.pause();
-      v.remove();
-      v.removeAttribute('src');
-      v.load();
-    } catch (e) {}
+  stopVideo(card) {
+    if (!card) return;
+    stopVideoIn(card);
+    card.classList.remove('playing', 'loading');
   },
 
   stopVideos() {
     if (!this.stage) return;
-    this.stage.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
-    this.stage.querySelectorAll('.gps-card.playing').forEach((c) => c.classList.remove('playing'));
+    this.stage.querySelectorAll('.gps-card').forEach((c) => this.stopVideo(c));
   },
 
   // ---- drag --------------------------------------------------------------
@@ -503,9 +481,12 @@ const swipe = {
       else if (d.dx > th || (fling && d.dx > 0)) this.fly(1, d.dy);
       else {
         reset();
-        // Pointer capture on the card retargets the click away from the play
-        // button, so a tap that never became a drag is resolved here.
-        if (d.onPlay && Math.abs(d.dx) < 8 && Math.abs(d.dy) < 8) this.requestVideo();
+        // Pointer capture on the card retargets the compatibility click away
+        // from the play button, so for a pointer press this is the only trigger
+        // the control has. The window has to cover ordinary press jitter — at
+        // 8px a mouse that slid a few pixels, and most touches, pressed the
+        // button and got nothing at all.
+        if (d.onPlay && Math.abs(d.dx) < TAP_SLOP && Math.abs(d.dy) < TAP_SLOP) this.requestVideo();
       }
     };
     card.addEventListener('pointerup', end);

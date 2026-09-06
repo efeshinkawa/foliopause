@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FolioPause — Review Before Trash
 // @namespace    https://github.com/efeshinkawa/foliopause
-// @version      2.1.0
+// @version      2.2.0
 // @description  Local-first photo review for Google Photos: mark, keep, review, and confirm before anything moves to Trash.
 // @author       Efe Erim
 // @match        https://photos.google.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 /*!
  * @license MIT
- * FolioPause v2.1.0 — userscript build
+ * FolioPause v2.2.0 — userscript build
  * Card-based review for photos.google.com. Swipe left to mark, right to keep;
  * nothing is deleted until you review and confirm, and deleting only moves
  * photos to Google's Trash (recoverable for 60 days).
@@ -24,7 +24,7 @@
 (function () {
   'use strict';
   if (window.__gpSwipe) { window.__gpSwipe.open(); return; }
-  const APP_VERSION = "2.1.0";
+  const APP_VERSION = "2.2.0";
   const GP_TEST_MODE = false;
 
 // ---------------------------------------------------------------------------
@@ -181,6 +181,9 @@ const CSS = `
 .gps-play svg path{fill:currentColor}
 .gps-play:hover{background:rgba(26,30,44,.76);transform:translate(-50%,-50%) scale(1.06)}
 .gps-card.playing .gps-play,.gps-light-box.playing .gps-play{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.82)}
+/* resolving a source takes seconds on a cold rendition; the card says so */
+.gps-vload{position:absolute;inset:0;display:none;place-items:center;z-index:3;pointer-events:none}
+.gps-card.loading .gps-vload,.gps-light-box.loading .gps-vload{display:grid}
 
 /* verdict stamps */
 .gps-stamp{position:absolute;top:24px;display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:14px;
@@ -1482,63 +1485,113 @@ const api = {
 // image / video URLs served by Google's own CDN for this session
 const imgUrl = (it, size) => it.thumb + '=w' + size + '-h' + size + '-k-no';
 
-// A media key is served as several video renditions. Which of them a given
-// account and page build answers for is undocumented, so instead of guessing
-// we ask the browser once per session: load metadata from each candidate in
-// order and keep the first that really decodes. `=dv` is the original file and
-// is the last resort, so a session where nothing else answers behaves exactly
-// as before. Nothing here leaves Google's own media hosts.
-const VIDEO_VARIANTS = ['=m22', '=m18', '=dv'];
-const VIDEO_FALLBACK = VIDEO_VARIANTS[VIDEO_VARIANTS.length - 1];
-const VIDEO_PROBE_MS = 6000;
-const videoUrl = (it, variant) => it.thumb + (variant || videoSource.variant || VIDEO_FALLBACK);
+// A media key is served as several renditions, and which of them answers is
+// undocumented and varies per item. Measured against a real library:
+//   =m18  transcoded, range-seekable, answered for every item tested
+//         (1.8-8.3s to metadata)
+//   =dv   the untranscoded original; always answered, and fastest to first
+//         metadata (0.7-1.3s), but served whole rather than by range
+//   =m22  answered for one item in three — the rest return an image/png error
+//         page — and needed ~9.5s when it did exist, so it is not worth a turn
+// So there is nothing to guess up front: mount the first candidate straight
+// away and move down the list only if it errors or never speaks. The earlier
+// build probed the renditions before mounting anything, which cost the user up
+// to twelve seconds of a dead card before playback could even begin.
+// Nothing here leaves Google's own media hosts.
+const VIDEO_VARIANTS = ['=m18', '=dv'];
+const VIDEO_STALL_MS = 3500;    // silent this long: the rendition is not coming
+const VIDEO_LAST_MS = 12000;    // the final candidate is given room before we give up
+const videoUrl = (it, variant) => it.thumb + variant;
 
+// The item list comes from Google, but a media URL is the one value here that
+// the browser fetches on its own, so it is worth proving rather than trusting:
+// a base that ever pointed elsewhere would turn a play press into a request to
+// a third party. The stated guarantee is that nothing leaves Google's own
+// hosts, so enforce exactly that.
+function googleMediaBase(url) {
+  if (typeof url !== 'string' || !url || url.length > 16384) return false;
+  let u;
+  try { u = new URL(url, location.href); } catch (e) { return false; }
+  if (u.origin === location.origin) return true;   // the host page's own server
+  return u.protocol === 'https:'
+    && (u.hostname === 'googleusercontent.com' || u.hostname.endsWith('.googleusercontent.com')
+      || u.hostname === 'google.com' || u.hostname.endsWith('.google.com'));
+}
+
+// Which rendition answered last time, as a hint only: every item still walks
+// the whole list, so one awkward video cannot pin the rest of the session to a
+// worse source.
 const videoSource = {
-  variant: null,     // resolved rendition for this session
-  probing: null,
-
-  probe(url) {
-    return new Promise((resolve) => {
-      const el = document.createElement('video');
-      el.preload = 'metadata';
-      el.muted = true;
-      let settled = false;
-      const done = (ok) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        try { el.removeAttribute('src'); el.load(); } catch (e) {}
-        resolve(ok);
-      };
-      const timer = setTimeout(() => done(false), VIDEO_PROBE_MS);
-      el.addEventListener('loadedmetadata', () => done(el.videoWidth > 0 || el.duration > 0), { once: true });
-      el.addEventListener('error', () => done(false), { once: true });
-      el.src = url;
-    });
+  variant: null,
+  order() {
+    if (!this.variant) return VIDEO_VARIANTS.slice();
+    return [this.variant].concat(VIDEO_VARIANTS.filter((v) => v !== this.variant));
   },
-
-  // Called as soon as a video reaches the top of the deck so the probe is
-  // already finished by the time the user actually presses play.
-  resolve(item) {
-    if (this.variant) return Promise.resolve(this.variant);
-    if (this.probing) return this.probing;
-    if (!item || typeof item.thumb !== 'string' || !item.thumb) return Promise.resolve(VIDEO_FALLBACK);
-    this.probing = (async () => {
-      for (const variant of VIDEO_VARIANTS) {
-        if (variant === VIDEO_FALLBACK) break;         // the fallback needs no probe
-        let ok = false;
-        try { ok = await this.probe(item.thumb + variant); } catch (e) { ok = false; }
-        if (ok) return variant;
-      }
-      return VIDEO_FALLBACK;
-    })().catch(() => VIDEO_FALLBACK).then((variant) => {
-      this.variant = variant;
-      this.probing = null;
-      return variant;
-    });
-    return this.probing;
-  },
+  remember(variant) { if (VIDEO_VARIANTS.indexOf(variant) !== -1) this.variant = variant; },
 };
+
+// ---------------------------------------------------------------------------
+// Playback, shared by the swipe card and the review lightbox.
+//
+// `onState` is called with 'loading' | 'playing' | 'paused' | 'failed' so each
+// surface paints its own affordance; the walk between renditions is invisible
+// to it. The controller is parked on the host element so a teardown from
+// anywhere (a decision, a close, a second press) can cancel a walk in flight
+// instead of racing it.
+// ---------------------------------------------------------------------------
+function stopVideoIn(host) {
+  if (!host) return;
+  if (host._fpPlayer) { const p = host._fpPlayer; host._fpPlayer = null; p.stop(); }
+  host.querySelectorAll('video').forEach((v) => {
+    try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
+  });
+}
+
+function playVideoIn(host, item, before, onState) {
+  stopVideoIn(host);
+  if (!item || !googleMediaBase(item.thumb)) { try { onState('failed'); } catch (e) {} return null; }
+  const order = videoSource.order();
+  let idx = 0, el = null, timer = null, done = false;
+  const state = (s) => { try { onState(s); } catch (e) {} };
+  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const drop = () => {
+    clear();
+    if (!el) return;
+    const v = el; el = null;
+    try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
+  };
+  const stop = () => { done = true; drop(); };
+
+  const next = () => {
+    drop();
+    if (done) return;
+    if (idx >= order.length) { done = true; if (host._fpPlayer === ctl) host._fpPlayer = null; state('failed'); return; }
+    const variant = order[idx++];
+    const last = idx >= order.length;
+    const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
+    el = v;
+    // A rendition Google does not serve for this item errors within a few
+    // hundred ms; one it will never serve simply stays silent, so silence
+    // needs its own deadline.
+    const advance = () => { if (v._gone || done) return; next(); };
+    timer = setTimeout(advance, last ? VIDEO_LAST_MS : VIDEO_STALL_MS);
+    v.addEventListener('error', advance);
+    v.addEventListener('loadedmetadata', () => { clear(); videoSource.remember(variant); }, { once: true });
+    v.addEventListener('playing', () => state('playing'));
+    v.addEventListener('pause', () => state('paused'));
+    v.addEventListener('ended', () => state('paused'));
+    v.src = videoUrl(item, variant);
+    host.insertBefore(v, before || null);
+    v.play().catch(() => {});
+  };
+
+  const ctl = { stop: stop, el: () => el };
+  host._fpPlayer = ctl;
+  state('loading');
+  next();
+  return ctl;
+}
+
 const photoPageUrl = (it) => BASE + 'photo/' + it.mediaKey;
 const trashPageUrl = () => BASE + 'trash';
 
@@ -2450,6 +2503,9 @@ function syncCursor() {
 // ---------------------------------------------------------------------------
 
 const HISTORY_MAX = 500;
+// How far a pointer may wander and still count as a press rather than a drag.
+// A mouse click drifts a pixel or two; a touch commonly drifts fifteen.
+const TAP_SLOP = 24;
 const history = [];                 // swipe decisions + confirmed trash batches
 const session = { kept: 0, marked: 0, deleted: 0 };
 
@@ -2568,7 +2624,11 @@ const swipe = {
         onclick: () => this.requestVideo(),
         onmousedown: (e) => e.preventDefault(),
       }, icon('play')));
-      if (!isBack) videoSource.resolve(item);   // warm the probe before the first press
+      // Fetching the first frame can take a few seconds. Without a marker of
+      // its own the card sits on a frozen still with the play control already
+      // hidden, which reads as a dead press.
+      card.appendChild(h('div', { class: 'gps-vload', role: 'status', 'aria-label': t('videoLoading') },
+        h('div', { class: 'gps-spin' })));
     }
 
     card.appendChild(h('div', { class: 'gps-stamp del' }, icon('trash'), t('stampDel')));
@@ -2644,7 +2704,7 @@ const swipe = {
     const el = cur.el, item = cur.item;
     this.top = null;
     if (el._cancelDrag) el._cancelDrag();
-    el.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
+    stopVideoIn(el);
     el.classList.add('fly');
     const dist = this.stage.clientWidth * 0.9 + 420;
     el.style.transform = 'translate(' + dir * dist + 'px,' + (dy || 0) + 'px) rotate(' + dir * 22 + 'deg)';
@@ -2794,8 +2854,9 @@ const swipe = {
   },
 
   // ---- video -------------------------------------------------------------
-  // One press can arrive as both a click on the overlay and a resolved tap
-  // from the drag handler below; the guard keeps it a single toggle.
+  // A press can arrive as the button's own click (keyboard, assistive tech) or
+  // as a tap resolved by the drag handler below, so the guard keeps it a single
+  // toggle.
   lastVideoToggle: 0,
   requestVideo() {
     const now = performance.now();
@@ -2804,70 +2865,40 @@ const swipe = {
     this.act('video');
   },
 
-  async toggleVideo() {
+  toggleVideo() {
     const cur = this.top;
     if (!cur || !cur.item.isVideo) return;
+    // A second press while a source is still being resolved is a cancel; the
+    // card must never be a place the user cannot get out of.
+    if (cur.el.classList.contains('loading')) { this.stopVideo(cur.el); return; }
     const existing = cur.el.querySelector('video');
     if (existing) {
       if (existing.paused) existing.play().catch(() => {});
       else existing.pause();
       return;
     }
-    if (cur.el._videoPending) return;
-    let variant = videoSource.variant;
-    if (!variant) {
-      cur.el._videoPending = true;
-      cur.el.classList.add('playing');
-      app.snack(t('videoLoading'), { ms: 2000 });
-      try { variant = await videoSource.resolve(cur.item); }
-      finally { cur.el._videoPending = false; }
-      // the card may have been decided while the probe was running
-      if (this.top !== cur || !cur.el.isConnected) { cur.el.classList.remove('playing'); return; }
-    }
-    this.mountVideo(cur.el, cur.item, variant);
+    this.mountVideo(cur.el, cur.item);
   },
 
-  mountVideo(card, item, variant) {
-    const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
-    const fail = () => {
-      if (v._gone || !v.isConnected) return;
-      clearTimeout(timer);
-      this.teardownVideo(v);
-      card.classList.remove('playing');
-      // A probed rendition can still be missing for one individual item; the
-      // original file is the last thing left to try.
-      if (variant !== VIDEO_FALLBACK) { videoSource.variant = VIDEO_FALLBACK; this.mountVideo(card, item, VIDEO_FALLBACK); return; }
+  mountVideo(card, item) {
+    return playVideoIn(card, item, card.querySelector('.gps-chips'), (state) => {
+      card.classList.toggle('loading', state === 'loading');
+      card.classList.toggle('playing', state === 'loading' || state === 'playing');
+      if (state !== 'failed') return;
+      this.stopVideo(card);
       app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
-    };
-    const timer = setTimeout(() => { if (v.readyState === 0) fail(); }, 15000);
-    v.addEventListener('error', fail);
-    v.addEventListener('loadedmetadata', () => clearTimeout(timer));
-    v.addEventListener('play', () => card.classList.add('playing'));
-    v.addEventListener('pause', () => card.classList.remove('playing'));
-    v.addEventListener('ended', () => card.classList.remove('playing'));
-    v.src = videoUrl(item, variant);
-    card.classList.add('playing');
-    card.insertBefore(v, card.querySelector('.gps-chips'));
-    v.play().catch(() => {});
-    return v;
+    });
   },
 
-  // Detaching first, and flagging the element, keeps the teardown's own
-  // load() from being mistaken for a playback failure and remounting.
-  teardownVideo(v) {
-    try {
-      v._gone = true;
-      v.pause();
-      v.remove();
-      v.removeAttribute('src');
-      v.load();
-    } catch (e) {}
+  stopVideo(card) {
+    if (!card) return;
+    stopVideoIn(card);
+    card.classList.remove('playing', 'loading');
   },
 
   stopVideos() {
     if (!this.stage) return;
-    this.stage.querySelectorAll('video').forEach((v) => this.teardownVideo(v));
-    this.stage.querySelectorAll('.gps-card.playing').forEach((c) => c.classList.remove('playing'));
+    this.stage.querySelectorAll('.gps-card').forEach((c) => this.stopVideo(c));
   },
 
   // ---- drag --------------------------------------------------------------
@@ -2945,9 +2976,12 @@ const swipe = {
       else if (d.dx > th || (fling && d.dx > 0)) this.fly(1, d.dy);
       else {
         reset();
-        // Pointer capture on the card retargets the click away from the play
-        // button, so a tap that never became a drag is resolved here.
-        if (d.onPlay && Math.abs(d.dx) < 8 && Math.abs(d.dy) < 8) this.requestVideo();
+        // Pointer capture on the card retargets the compatibility click away
+        // from the play button, so for a pointer press this is the only trigger
+        // the control has. The window has to cover ordinary press jitter — at
+        // 8px a mouse that slid a few pixels, and most touches, pressed the
+        // button and got nothing at all.
+        if (d.onPlay && Math.abs(d.dx) < TAP_SLOP && Math.abs(d.dy) < TAP_SLOP) this.requestVideo();
       }
     };
     card.addEventListener('pointerup', end);
@@ -3207,39 +3241,29 @@ const review = {
       class: 'gps-play', hidden: true, title: t('playVideo') + ' (V)', 'aria-label': t('playVideo'),
       onclick: (e) => { e.stopPropagation(); startVideo(); },
     }, icon('play'));
-    const media = h('div', { class: 'im' }, img, play, prev, next);
+    const load = h('div', { class: 'gps-vload', role: 'status', 'aria-label': t('videoLoading') },
+      h('div', { class: 'gps-spin' }));
+    const media = h('div', { class: 'im' }, img, play, load, prev, next);
     const box = h('div', { class: 'gps-light-box' }, bar, media);
 
     const stopVideo = () => {
-      const v = media.querySelector('video');
-      if (v) {
-        try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
-      }
-      box.classList.remove('playing');
+      stopVideoIn(media);
+      box.classList.remove('playing', 'loading');
     };
-    const startVideo = async () => {
+    const startVideo = () => {
       const it = all[idx];
-      if (!it || !it.isVideo || media.querySelector('video')) return;
-      box.classList.add('playing');
-      let variant = videoSource.variant;
-      if (!variant) {
-        app.snack(t('videoLoading'), { ms: 2000 });
-        variant = await videoSource.resolve(it);
-        if (!box.isConnected || all[idx] !== it) { box.classList.remove('playing'); return; }
-      }
-      const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
-      const fail = () => {
-        if (v._gone || !v.isConnected) return;
+      if (!it || !it.isVideo) return;
+      // A second press while a source is still being resolved is a cancel.
+      if (box.classList.contains('loading')) { stopVideo(); return; }
+      if (media.querySelector('video')) return;
+      playVideoIn(media, it, prev, (state) => {
+        if (!box.isConnected || all[idx] !== it) return;
+        box.classList.toggle('loading', state === 'loading');
+        box.classList.toggle('playing', state === 'loading' || state === 'playing');
+        if (state !== 'failed') return;
         stopVideo();
         app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
-      };
-      v.addEventListener('error', fail);
-      v.addEventListener('play', () => box.classList.add('playing'));
-      v.addEventListener('pause', () => box.classList.remove('playing'));
-      v.addEventListener('ended', () => box.classList.remove('playing'));
-      v.src = videoUrl(it, variant);
-      media.insertBefore(v, prev);
-      v.play().catch(() => {});
+      });
     };
 
     const paint = () => {

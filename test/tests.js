@@ -317,16 +317,39 @@
     check(/\d:\d\d/.test(card.querySelector('.gps-chip.vid').textContent), 'the chip shows a running time');
     check(play && play.getAttribute('aria-label').length > 0, 'the play control is labelled for assistive tech');
 
-    // The mock serves an image where a video stream would be, so this also
-    // covers the failure path: probe every rendition, fall back to the
-    // original file, then give up once instead of remounting forever.
+    // A press must show something immediately: the earlier build resolved a
+    // rendition before mounting anything, which left the card on a frozen
+    // still with the play control already hidden for up to twelve seconds.
     play.click();
+    check(await until(() => card.classList.contains('loading'), 1000), 'the card says it is working on it');
+    check(!!card.querySelector('video'), 'a source is mounted on the press, not after a probe');
+    check(!!card.querySelector('.gps-vload'), 'the card carries a visible loading marker');
+
+    // The mock serves an image where a video stream would be, so this also
+    // covers the failure path: walk every rendition, then give up once instead
+    // of remounting forever.
     check(await until(() => snacks().some((x) => /oynatılamadı|could not play/i.test(x)), 25000),
       'an unplayable source is reported instead of failing silently');
-    check(S().videoSource.variant === '=dv', 'the probe settled on the original file, got ' + S().videoSource.variant);
+    check(S().videoSource.variant === null, 'nothing unplayable is remembered for the session, got ' + S().videoSource.variant);
     await sleep(500);
     check(card.querySelectorAll('video').length === 0, 'the dead <video> is torn down, not retried forever');
     check(!card.classList.contains('playing'), 'the play control returns after a failure');
+    check(!card.classList.contains('loading'), 'the loading marker clears after a failure');
+
+    // Pointer capture on the card retargets the compatibility click away from
+    // the button, so a pointer press is only ever resolved by the drag
+    // handler. At the old 8px window an ordinary press that drifted did
+    // nothing at all: no video, no message, no console error.
+    S().swipe.stopVideo(card);
+    S().swipe.lastVideoToggle = 0;
+    const box = play.getBoundingClientRect();
+    const at = (type, dx, dy) => play.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 7, button: 0, isPrimary: true,
+      clientX: box.left + box.width / 2 + dx, clientY: box.top + box.height / 2 + dy,
+    }));
+    at('pointerdown', 0, 0); at('pointermove', 11, 6); at('pointerup', 11, 6);
+    check(await until(() => card.classList.contains('loading') || !!card.querySelector('video'), 1500),
+      'a press that drifts a few pixels still starts the video');
   });
 
   test('review badges videos and can play them from the preview', async () => {

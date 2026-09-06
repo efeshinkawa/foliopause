@@ -152,6 +152,9 @@ const CSS = `
 .gps-play svg path{fill:currentColor}
 .gps-play:hover{background:rgba(26,30,44,.76);transform:translate(-50%,-50%) scale(1.06)}
 .gps-card.playing .gps-play,.gps-light-box.playing .gps-play{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.82)}
+/* resolving a source takes seconds on a cold rendition; the card says so */
+.gps-vload{position:absolute;inset:0;display:none;place-items:center;z-index:3;pointer-events:none}
+.gps-card.loading .gps-vload,.gps-light-box.loading .gps-vload{display:grid}
 
 /* verdict stamps */
 .gps-stamp{position:absolute;top:24px;display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:14px;

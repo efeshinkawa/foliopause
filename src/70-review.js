@@ -250,39 +250,29 @@ const review = {
       class: 'gps-play', hidden: true, title: t('playVideo') + ' (V)', 'aria-label': t('playVideo'),
       onclick: (e) => { e.stopPropagation(); startVideo(); },
     }, icon('play'));
-    const media = h('div', { class: 'im' }, img, play, prev, next);
+    const load = h('div', { class: 'gps-vload', role: 'status', 'aria-label': t('videoLoading') },
+      h('div', { class: 'gps-spin' }));
+    const media = h('div', { class: 'im' }, img, play, load, prev, next);
     const box = h('div', { class: 'gps-light-box' }, bar, media);
 
     const stopVideo = () => {
-      const v = media.querySelector('video');
-      if (v) {
-        try { v._gone = true; v.pause(); v.remove(); v.removeAttribute('src'); v.load(); } catch (e) {}
-      }
-      box.classList.remove('playing');
+      stopVideoIn(media);
+      box.classList.remove('playing', 'loading');
     };
-    const startVideo = async () => {
+    const startVideo = () => {
       const it = all[idx];
-      if (!it || !it.isVideo || media.querySelector('video')) return;
-      box.classList.add('playing');
-      let variant = videoSource.variant;
-      if (!variant) {
-        app.snack(t('videoLoading'), { ms: 2000 });
-        variant = await videoSource.resolve(it);
-        if (!box.isConnected || all[idx] !== it) { box.classList.remove('playing'); return; }
-      }
-      const v = h('video', { controls: true, playsinline: true, preload: 'auto' });
-      const fail = () => {
-        if (v._gone || !v.isConnected) return;
+      if (!it || !it.isVideo) return;
+      // A second press while a source is still being resolved is a cancel.
+      if (box.classList.contains('loading')) { stopVideo(); return; }
+      if (media.querySelector('video')) return;
+      playVideoIn(media, it, prev, (state) => {
+        if (!box.isConnected || all[idx] !== it) return;
+        box.classList.toggle('loading', state === 'loading');
+        box.classList.toggle('playing', state === 'loading' || state === 'playing');
+        if (state !== 'failed') return;
         stopVideo();
         app.snack(t('videoFail'), { kind: 'err', ms: 5000 });
-      };
-      v.addEventListener('error', fail);
-      v.addEventListener('play', () => box.classList.add('playing'));
-      v.addEventListener('pause', () => box.classList.remove('playing'));
-      v.addEventListener('ended', () => box.classList.remove('playing'));
-      v.src = videoUrl(it, variant);
-      media.insertBefore(v, prev);
-      v.play().catch(() => {});
+      });
     };
 
     const paint = () => {
