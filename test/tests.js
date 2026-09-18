@@ -404,9 +404,8 @@
     check(await until(() => !!dlg(), 2000), 'settings dialog opened');
     const num = dlg().querySelector('input[type=number]');
     check(!!num, 'has the review-interval field');
-    const source = dlg().querySelector('select');
-    const feedGenBefore = S().feed.gen;
-    source.value = '2';
+    check(!dlg().querySelector('input[type=date]'), 'the scan filters moved out of Settings into the scan menu');
+    check(!!Array.prototype.find.call(dlg().querySelectorAll('button'), (b) => /Tarama modu|Scan mode/.test(b.textContent)), 'Settings links to the scan menu');
     num.value = '25';
     const theme = Array.prototype.find.call(dlg().querySelectorAll('select'), (el) => Array.prototype.some.call(el.options, (o) => o.value === 'light'));
     const language = Array.prototype.find.call(dlg().querySelectorAll('select'), (el) => Array.prototype.some.call(el.options, (o) => o.value === 'it'));
@@ -426,12 +425,24 @@
     check(S().state.settings.reviewEvery === 25, 'interval saved');
     check(S().state.settings.theme === 'light', 'theme saved');
     check(S().state.settings.language === 'en', 'manual language saved');
-    check(S().state.settings.source === 2 && S().feed.gen > feedGenBefore, 'language plus source change rebuilds and invalidates the old feed');
     check(document.querySelector('.gps-review-label').textContent === 'Review', 'language switches live without a page reload');
     const raw = JSON.parse(localStorage.getItem(M.STATE_KEY));
     check(raw.settings.reviewEvery === 25, 'persisted to localStorage');
     check(raw.settings.language === 'en', 'language persisted to localStorage');
     S().state.settings.theme = 'dark'; S().app.applyTheme();
+
+    // the source now lives in the scan menu (M), and changing it restarts the feed
+    key('m');
+    check(await until(() => !!dlg() && /Where should we start|Nereden/.test(dlg().textContent), 2000), 'M opens the scan menu');
+    const scope = Array.prototype.find.call(dlg().querySelectorAll('select'), (el) => Array.prototype.some.call(el.options, (o) => o.value === 'album'));
+    check(!!scope, 'the scan menu offers the source including an album');
+    const feedGenBefore = S().feed.gen;
+    scope.value = '2'; scope.dispatchEvent(new Event('change'));
+    Array.prototype.find.call(dlg().querySelectorAll('button'), (b) => /^(Start|Başla)$/.test(b.textContent.trim())).click();
+    await sleep(150);
+    check(!dlg(), 'the scan menu closed on Start');
+    check(S().state.settings.source === 2 && S().feed.gen > feedGenBefore, 'a source change restarts the feed');
+    check(/Archive|Arşiv/.test(document.querySelector('.gps-mode-label').textContent), 'the app-bar chip names the new source');
   });
 
   test('keyboard is swallowed so Google Photos hotkeys never fire underneath', async () => {

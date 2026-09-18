@@ -38,6 +38,7 @@ that list and confirm does FolioPause move them — to Google's Trash, where the
 remain recoverable for 60 days.
 
 WHAT IT DOES
+- Choose where to start: newest first, oldest first, random, or one album, with optional date, media-type and favorite filters
 - Swipe, or use the arrow keys, to sort through a large library quickly
 - Undo any decision, one at a time or all at once
 - A review reminder every 100 photos, plus a Review button that is always available

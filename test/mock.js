@@ -1,10 +1,18 @@
 // Mock of the Google Photos internals the cleaner depends on: WIZ_global_data
-// plus the batchexecute endpoint (lcxiM, XwAOJf, VrseUb, zy0IHe, EWgK9e).
+// plus the batchexecute endpoint (lcxiM, XwAOJf, VrseUb, zy0IHe, EWgK9e,
+// Z5xsfc, snAcKc).
 // Query params: n=items  page=pageSize  every=reviewEvery  acct=namespace  intro=0|1
+//               menu=0|1 (show the scan menu on open)  order=newest|oldest|random
+//               albpage=albums per Z5xsfc page  spread=hours between photos
 (function () {
   const Q = new URLSearchParams(location.search);
   const N = parseInt(Q.get('n') || '30', 10);
   const pageCap = parseInt(Q.get('page') || '10', 10);
+  const albumPageCap = parseInt(Q.get('albpage') || '100', 10);
+  const spreadHours = parseFloat(Q.get('spread') || '1');
+  // burst=K: photos come in bursts of K taken minutes apart, bursts a month
+  // apart — the shape of a phone library, which random order must mix up.
+  const burst = parseInt(Q.get('burst') || '0', 10);
   const acct = Q.get('acct') || String(Math.random()).slice(2);
   let emptyFirstPending = Q.get('emptyFirst') === '1';
 
@@ -23,7 +31,9 @@
   const STATE_KEY = 'gpSwipe.state.v2.' + NS;
   const seeded = {
     settings: {
-      source: 1, startDate: '', resume: true, skipVideos: false, skipFav: false,
+      source: 1, dateFrom: '', dateTo: '', resume: true, mediaType: 'all', skipFav: false,
+      order: Q.get('order') || 'newest', albumKey: null, albumTitle: '', albumAuthKey: null,
+      showStartMenu: Q.get('menu') === '1',
       reviewEvery: parseInt(Q.get('every') || '0', 10), theme: 'dark',
     },
     stats: { kept: 0, deleted: 0, freedBytes: 0 },
@@ -33,6 +43,7 @@
   localStorage.setItem(STATE_KEY, JSON.stringify(seeded));
 
   const base = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const ME = 'ACTOR-ME', OTHER = 'ACTOR-OTHER';
   const items = [];
   for (let i = 0; i < N; i++) {
     const ext = {
@@ -45,18 +56,50 @@
     items.push([
       'MK' + String(i).padStart(4, '0'),
       ['pic' + (i % 6) + '.svg?i=' + i, 1200 + (i % 3) * 200, 800],
-      base - i * 3600 * 1000,                              // newest first
+      burst > 0
+        ? base - Math.floor(i / burst) * 30 * 86400000 - (i % burst) * 60000   // bursts, newest first
+        : base - Math.round(i * spreadHours * 3600 * 1000),                     // evenly spread, newest first
       'DK' + String(i).padStart(4, '0'),
       3600 * 1000,
       base - i * 1000,
-      null, null, null, null, null, null, null,
+      [ME], null, null, null, null, null, null,
       false,
       ext,
     ]);
   }
 
+  // Albums. A is the user's own; B is the user's own but shared out and holds
+  // one row uploaded by somebody else (not part of this library); C was shared
+  // TO the user by somebody else; E is empty. Album metadata mirrors Z5xsfc:
+  // the descriptive block lives under key 72930366 in the trailing object.
+  const foreign = ['MK-FOREIGN', ['pic1.svg?i=foreign', 1200, 800], base - 30 * 60 * 1000, 'DK-FOREIGN', 3600 * 1000, base,
+    [OTHER], null, 2, { 15: 1 }];
+  const albumDefs = [
+    { key: 'ALB-A', title: 'Tatil 2025', owner: ME, kind: 1, shared: false, pick: (it, i) => i % 4 === 0 },
+    { key: 'ALB-B', title: 'Ortak albüm', owner: ME, kind: 1, shared: true, authKey: 'AUTH-B', pick: (it, i) => i % 3 === 1, extra: [foreign] },
+    { key: 'ALB-C', title: 'Paylaşılan (başkasının)', owner: OTHER, kind: 4, shared: true, authKey: 'AUTH-C', pick: () => false, extra: [foreign] },
+    { key: 'ALB-E', title: 'Boş albüm', owner: ME, kind: 1, shared: false, pick: () => false },
+  ];
+  // Inside an album Google hands out a different mediaKey for the same photo
+  // (the dedupKey is what stays the same), so album rows are copies with
+  // their own key. EWgK9e/VrseUb only know the library keys.
+  const albumRows = (def) => items.filter((it, i) => def.pick(it, i))
+    .map((it, n) => { const row = it.slice(); row[0] = 'AK-' + def.key + '-' + it[0]; return row; })
+    .concat(def.extra || []);
+  const albumRow = (def) => {
+    const rows = albumRows(def);
+    const first = rows[0];
+    const ts = rows.map((r) => r[2]);
+    const meta = [def.kind, def.title, [ts.length ? Math.min.apply(null, ts) : null, ts.length ? Math.max.apply(null, ts) : null,
+      null, null, base, null, null, null, null, base], rows.length, def.shared ? true : null, def.authKey || null];
+    const row = [def.key, first ? [first[1][0], first[1][1], first[1][2]] : null, null, null, null, null, [def.owner], [[3], [4]]];
+    if (def.kind === 4) row.push(null, null, null);        // shared-with-me rows are longer; the ext object stays last
+    row.push({ 72930366: meta });
+    return row;
+  };
+
   const mock = window.__mock = {
-    items, NS, STATE_KEY,
+    items, NS, STATE_KEY, albumDefs, ME, OTHER, foreign,
     trashed: new Set(),      // dedup keys
     failNextTrash: 0,        // how many XwAOJf calls should return an error frame
     fatalTrash: false,       // make trash calls fail with HTTP 401 (session expired)
@@ -105,6 +148,26 @@
     zy0IHe: function () {
       const rows = items.filter((it) => mock.trashed.has(it[3])).map((it) => [it[0], it[1], it[2], it[3], it[4], it[5]]);
       return { payload: [rows, null] };
+    },
+    Z5xsfc: function (p) {
+      const start = p[0] ? parseInt(p[0], 10) : 0;
+      const size = Math.min(p[7] || 100, albumPageCap);
+      const rows = albumDefs.slice(start, start + size).map(albumRow);
+      const next = start + size < albumDefs.length ? String(start + size) : null;
+      return { payload: [rows, next, [1], [1]] };
+    },
+    snAcKc: function (p) {
+      const def = albumDefs.find((d) => d.key === p[0]);
+      if (!def) return { error: [5] };
+      if (def.authKey && p[3] !== def.authKey) return { error: [7] };
+      const live = albumRows(def).filter((r) => !mock.trashed.has(r[3]));
+      const start = p[1] ? parseInt(p[1], 10) : 0;
+      const page = live.slice(start, start + pageCap);
+      // Google ends an album with an empty-string token, not null.
+      const next = start + pageCap < live.length ? String(start + pageCap) : '';
+      const meta = [def.key, def.title, null, null, null, [def.owner, '1'], null, null, null, null,
+        null, null, def.key, null, false, null, false, 0, null, def.authKey || null, null, live.length];
+      return { payload: [null, page, next, meta, null, 0] };
     },
     EWgK9e: function (p) {
       const keys = p[0][0][0];

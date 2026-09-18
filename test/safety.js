@@ -278,7 +278,7 @@
     M.delay = 5;
     check(batch.every((i) => M.trashed.has(i.dedupKey)), 'the confirmed batch reached Trash');
     check(batch.every((i) => !S().marked.has(i.mediaKey)), 'verified rows left the local review queue');
-    const safeRestart = M.calls.some((c) => c.rpcid === 'lcxiM' && c.payload[0] == null && c.payload[1] === boundary);
+    const safeRestart = M.calls.some((c) => c.rpcid === 'lcxiM' && c.payload[0] == null && c.payload[1] === boundary.newest);
     check(safeRestart, 'feed restarted from an inclusive timestamp after mutation');
 
     const trashEntry = S().history.slice().reverse().find((e) => e.action === 'trash');

@@ -23,6 +23,15 @@
     } else if (scene === 'settings') {
       s.state.settings.reviewEvery = 100;
       s.app.openSettings();
+    } else if (scene === 'menu') {
+      s.app.openScanMenu();
+    } else if (scene === 'menu-filters') {
+      s.app.openScanMenu();
+      const toggle = Array.prototype.find.call(document.querySelectorAll('.gps-scrim button'), (b) => /Filtreler|Filters/.test(b.textContent));
+      if (toggle) toggle.click();
+    } else if (scene === 'albums') {
+      s.app.openScanMenu({ pickAlbum: true });
+      await until(() => document.querySelectorAll('.gps-album').length > 0 && !document.querySelector('.gps-scrim .gps-spin'));
     }
     document.body.dataset.visualReady = 'true';
   })();

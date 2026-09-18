@@ -107,21 +107,48 @@ required; an optional userscript build is also available at
 
 ## How it works
 
-1. **Swipe left** to add a photo to the pending Review list. Nothing is
+1. On start, the **scan menu** asks where to begin: newest first, oldest
+   first, random, or one album — with optional filters (date range, photos or
+   videos only, skip favorites). It can be turned off and reopened any time
+   from the mode chip in the top bar, from Settings, or with `M`.
+2. **Swipe left** to add a photo to the pending Review list. Nothing is
    deleted.
-2. **Swipe right** to keep it and stop showing it again.
-3. FolioPause asks for a review every 100 decisions by default. The interval can
+3. **Swipe right** to keep it and stop showing it again.
+4. FolioPause asks for a review every 100 decisions by default. The interval can
    be changed or disabled in Settings.
-4. The **Review** action remains available in both the top bar and the
+5. The **Review** action remains available in both the top bar and the
    bottom action bar.
-5. In Review, keep individual photos, change the entire batch, or use **Undo
+6. In Review, keep individual photos, change the entire batch, or use **Undo
    all** to return every marked photo to the swipe queue.
-6. Only selected photos move to Google Photos Trash after explicit
+7. Only selected photos move to Google Photos Trash after explicit
    confirmation.
-7. FolioPause checks Trash before treating an item as successfully moved.
+8. FolioPause checks Trash before treating an item as successfully moved.
    Failed or unknown results remain visible for review.
-8. The most recent confirmed batch can be restored with **Undo** during the
+9. The most recent confirmed batch can be restored with **Undo** during the
    current app session.
+
+### Scan orders
+
+Google's own listing only pages newest-first, so the other orders are built
+on top of it:
+
+- **Newest first** pages down from the most recent photo (or from where you
+  left off).
+- **Oldest first** reads the timeline in timestamp intervals from the oldest
+  photo upwards. Finding the oldest photo takes a few extra requests once per
+  session; after that it costs about the same as newest first.
+- **Random** draws timestamps across the whole span of the library and
+  interleaves a dozen photos from each draw, so consecutive cards come from
+  different periods. The draw is uniform in time, not in photos, so busy
+  periods are under-represented. Once random draws stop finding anything new,
+  the remaining photos are swept newest-first so the mode still finishes.
+- **One album** reads the album once, then sorts or shuffles it locally. Only
+  albums you created are offered; in a shared album only photos you uploaded
+  are shown, because nobody else's can be moved to Trash from here.
+
+A photo you keep or mark in one scan is never offered again by another: an
+album lists the same photo under a different identifier than the library, so
+decisions are recorded under both identifiers.
 
 The scoreboard shows **Reviewed**, **Kept**, **Pending**, and **Moved to
 Trash**. FolioPause does not invent a “photos remaining” total because the
@@ -135,9 +162,10 @@ internal list response does not provide a reliable library total.
 - Undo for the latest decision and latest confirmed Trash batch
 - Dry Run mode that never sends a Trash request
 - Local deletion-log export as JSON
-- Library, Archive, or combined source selection
+- Scan menu on start: newest first, oldest first, random, or one album
+- Library, Archive, or combined source selection; a date range; photos or
+  videos only; skip favorites
 - Videos marked as videos everywhere, and playable in place before deciding
-- Optional video and favorite filters
 - Light, dark, and system themes
 - Keyboard, mouse, and touch controls
 - English, Turkish, Italian, Spanish, and German
@@ -157,6 +185,7 @@ Language**.
 | `R` | Open or close Review |
 | `Space`, `Enter` | Open in Google Photos |
 | `V` | Play or pause video |
+| `M` | Open the scan menu |
 | `S` | Open Settings |
 | `?` | Show shortcuts |
 | `Esc` | Close or go back |

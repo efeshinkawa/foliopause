@@ -74,6 +74,7 @@ const CSS = `
 .gps-score-item{height:32px;padding:0 8px;border-radius:10px;display:inline-flex;align-items:center;gap:5px;background:var(--sf1);color:var(--onv)}
 .gps-bar.on-stage .gps-score-item{background:rgba(25,31,47,.84);backdrop-filter:blur(10px);color:#cbd2e3}
 .gps-score-item b{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;font-weight:650;color:var(--on)}
+.gps-score-item .lbl,.gps-btn>span{white-space:nowrap}
 .gps-bar.on-stage .gps-score-item b{color:#fff}
 .gps-score-item.pending svg{color:#d9ccff}
 .gps-score-item.deleted svg{color:var(--err)}
@@ -107,6 +108,13 @@ const CSS = `
 .gps-btn:disabled::before{opacity:0!important}
 .gps-badge{min-width:20px;height:20px;border-radius:10px;padding:0 6px;display:grid;place-items:center;background:var(--err);color:var(--sf);font-size:11px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
 .gps-btn.tonal .gps-badge{background:var(--on-pri-c);color:var(--pri-c)}
+
+/* scan-mode chip: names the current order and source, opens the menu */
+.gps-mode{height:36px;padding:0 12px 0 10px;border-radius:12px;gap:7px;font-weight:600;font-size:13px;background:var(--sf1);color:var(--onv);max-width:240px;flex:0 1 auto;min-width:36px}
+.gps-mode svg{width:18px;height:18px;color:var(--pri)}
+.gps-mode .gps-mode-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gps-bar.on-stage .gps-mode{background:rgba(25,31,47,.84);backdrop-filter:blur(10px);color:#e3e7f2}
+.gps-bar.on-stage .gps-mode svg{color:#c9bfff}
 
 /* ---------- body / views ---------- */
 .gps-body{flex:1 1 auto;position:relative;min-height:0;display:flex;flex-direction:column}
@@ -289,6 +297,55 @@ const CSS = `
 .gps-dlg td:first-child{color:var(--on);white-space:nowrap;width:44%}
 .gps-kbd{display:inline-block;border:1px solid var(--outline);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:11px;color:var(--on);background:var(--sf2);margin-right:4px}
 
+/* ---------- scan menu ---------- */
+.gps-dlg.wide{width:min(94vw,600px)}
+.gps-dlg .gps-sec{display:flex;flex-direction:column;gap:8px}
+.gps-dlg .gps-sec>.lbl{font-size:12px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--outline-s)}
+.gps-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.gps-choice{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px;border-radius:14px;text-align:left;
+  background:var(--sf2);color:var(--on);border:2px solid transparent;position:relative;overflow:hidden;
+  transition:border-color var(--d-s) var(--e-std),background var(--d-s) var(--e-std)}
+.gps-choice::before{content:"";position:absolute;inset:0;background:currentColor;opacity:0;transition:opacity var(--d-s) var(--e-std)}
+.gps-choice:hover::before{opacity:.06}
+.gps-choice .ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:var(--sf3);color:var(--onv)}
+.gps-choice .tt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.gps-choice .tt b{font-size:14px;font-weight:650;line-height:18px}
+.gps-choice .tt .hint{font-size:12px;line-height:16px;color:var(--onv)}
+.gps-choice[aria-checked=true]{border-color:var(--pri);background:var(--pri-c);color:var(--on-pri-c)}
+.gps-choice[aria-checked=true] .ic{background:var(--pri);color:var(--on-pri)}
+.gps-choice[aria-checked=true] .tt .hint{color:var(--on-pri-c);opacity:.85}
+.gps-album-row{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:12px;background:var(--sf2);min-height:56px}
+.gps-album-row img,.gps-album-row .ph{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--sf3);flex:none;display:grid;place-items:center;color:var(--onv)}
+.gps-album-row .tt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.gps-album-row .tt b{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gps-album-row .tt .hint{font-size:12px;color:var(--onv)}
+.gps-filters-toggle{align-self:flex-start;padding:0 10px 0 8px;height:36px}
+.gps-filters-toggle .gps-badge{margin-left:2px;background:var(--pri);color:var(--on-pri)}
+.gps-filters{display:flex;flex-direction:column;gap:12px;padding:12px;border-radius:14px;background:var(--sf2)}
+.gps-filters .gps-daterange{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gps-filters label.row{margin:0;padding:4px 0}
+.gps-filters label.row:hover{background:none}
+.gps-dlg .gps-err{color:var(--err)}
+.gps-dlg .gps-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.gps-dlg .gps-foot label.row{margin:0;padding:4px 0;font-size:13px;color:var(--onv)}
+.gps-dlg .gps-foot label.row:hover{background:none}
+
+/* ---------- album picker ---------- */
+.gps-dlg input[type=search]{background:var(--sf);color:var(--on);border:1px solid var(--outline);border-radius:10px;padding:10px 12px;font:inherit;width:100%}
+.gps-albums{display:flex;flex-direction:column;gap:4px;max-height:min(46vh,420px);overflow:auto;overscroll-behavior:contain;margin:0 -8px;padding:0 8px}
+.gps-albums::-webkit-scrollbar{width:10px}
+.gps-albums::-webkit-scrollbar-thumb{background:var(--sf3);border-radius:5px;border:2px solid var(--sf1)}
+.gps-album{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:12px;text-align:left;width:100%;color:var(--on);position:relative;overflow:hidden}
+.gps-album::before{content:"";position:absolute;inset:0;background:currentColor;opacity:0;transition:opacity var(--d-s) var(--e-std)}
+.gps-album:hover::before{opacity:.07}
+.gps-album img,.gps-album .ph{width:48px;height:48px;border-radius:10px;object-fit:cover;background:var(--sf2);flex:none;display:grid;place-items:center;color:var(--onv)}
+.gps-album .tt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+.gps-album .tt b{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gps-album .tt .hint{font-size:12px;color:var(--onv)}
+.gps-album .sh{flex:none;height:22px;padding:0 8px;border-radius:11px;background:var(--ok-c);color:var(--on-ok-c);font-size:11px;font-weight:600;display:inline-flex;align-items:center}
+.gps-albums-status{padding:20px;gap:8px}
+.gps-albums-status .gps-spin{width:28px;height:28px}
+
 /* ---------- lightbox preview ---------- */
 .gps-light-box{position:absolute;inset:0;background:#000;z-index:11;display:flex;flex-direction:column;animation:gps-fade var(--d-s) var(--e-std) both}
 .gps-light-box .im{flex:1 1 auto;position:relative;min-height:0}
@@ -330,9 +387,21 @@ const CSS = `
 #gps-fab svg{width:24px;height:24px}
 #gps-fab .b{min-width:20px;height:20px;border-radius:10px;padding:0 6px;display:grid;place-items:center;background:#641d2b;color:#ffd9de;font-size:11px;font-weight:650}
 
+@media (max-width:1180px){
+  .gps-score-item .lbl{display:none}
+  .gps-mode{max-width:200px}
+}
+@media (max-width:980px){
+  .gps-brand .n{display:none}
+  .gps-brand{gap:0}
+}
 @media (max-width:720px){
   .gps-bar{height:58px;padding:0 4px 0 8px}
   .gps-brand .n{display:none}
+  .gps-mode{width:36px;padding:0;justify-content:center;gap:0}
+  .gps-mode .gps-mode-label{display:none}
+  .gps-cards{grid-template-columns:1fr}
+  .gps-choice{flex-direction:row;align-items:center}
   .gps-score{gap:3px}
   .gps-score-item{height:30px;padding:0 7px}
   .gps-score-item .lbl{display:none}

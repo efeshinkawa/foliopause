@@ -80,6 +80,10 @@ async function waitReady(cdp) {
     { name: 'swipe-dark-mobile', width: 390, height: 844, scene: 'swipe', theme: 'dark', mobile: true },
     { name: 'review-dark-mobile', width: 390, height: 844, scene: 'review', theme: 'dark', mobile: true },
     { name: 'settings-light', width: 1024, height: 768, scene: 'settings', theme: 'light', mobile: false },
+    { name: 'scan-menu-dark-desktop', width: 1024, height: 900, scene: 'menu', theme: 'dark', mobile: false },
+    { name: 'scan-menu-filters-light', width: 1024, height: 900, scene: 'menu-filters', theme: 'light', mobile: false },
+    { name: 'scan-menu-dark-mobile', width: 390, height: 844, scene: 'menu', theme: 'dark', mobile: true },
+    { name: 'album-picker-dark-desktop', width: 1024, height: 900, scene: 'albums', theme: 'dark', mobile: false },
   ];
   for (const scene of scenes) {
     await cdp.send('Emulation.setDeviceMetricsOverride', {

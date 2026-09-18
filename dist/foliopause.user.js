@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FolioPause — Review Before Trash
 // @namespace    https://github.com/efeshinkawa/foliopause
-// @version      2.2.0
+// @version      2.3.0
 // @description  Local-first photo review for Google Photos: mark, keep, review, and confirm before anything moves to Trash.
 // @author       Efe Erim
 // @match        https://photos.google.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 /*!
  * @license MIT
- * FolioPause v2.2.0 — userscript build
+ * FolioPause v2.3.0 — userscript build
  * Card-based review for photos.google.com. Swipe left to mark, right to keep;
  * nothing is deleted until you review and confirm, and deleting only moves
  * photos to Google's Trash (recoverable for 60 days).
@@ -24,7 +24,7 @@
 (function () {
   'use strict';
   if (window.__gpSwipe) { window.__gpSwipe.open(); return; }
-  const APP_VERSION = "2.2.0";
+  const APP_VERSION = "2.3.0";
   const GP_TEST_MODE = false;
 
 // ---------------------------------------------------------------------------
@@ -103,6 +103,7 @@ const CSS = `
 .gps-score-item{height:32px;padding:0 8px;border-radius:10px;display:inline-flex;align-items:center;gap:5px;background:var(--sf1);color:var(--onv)}
 .gps-bar.on-stage .gps-score-item{background:rgba(25,31,47,.84);backdrop-filter:blur(10px);color:#cbd2e3}
 .gps-score-item b{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;font-weight:650;color:var(--on)}
+.gps-score-item .lbl,.gps-btn>span{white-space:nowrap}
 .gps-bar.on-stage .gps-score-item b{color:#fff}
 .gps-score-item.pending svg{color:#d9ccff}
 .gps-score-item.deleted svg{color:var(--err)}
@@ -136,6 +137,13 @@ const CSS = `
 .gps-btn:disabled::before{opacity:0!important}
 .gps-badge{min-width:20px;height:20px;border-radius:10px;padding:0 6px;display:grid;place-items:center;background:var(--err);color:var(--sf);font-size:11px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
 .gps-btn.tonal .gps-badge{background:var(--on-pri-c);color:var(--pri-c)}
+
+/* scan-mode chip: names the current order and source, opens the menu */
+.gps-mode{height:36px;padding:0 12px 0 10px;border-radius:12px;gap:7px;font-weight:600;font-size:13px;background:var(--sf1);color:var(--onv);max-width:240px;flex:0 1 auto;min-width:36px}
+.gps-mode svg{width:18px;height:18px;color:var(--pri)}
+.gps-mode .gps-mode-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gps-bar.on-stage .gps-mode{background:rgba(25,31,47,.84);backdrop-filter:blur(10px);color:#e3e7f2}
+.gps-bar.on-stage .gps-mode svg{color:#c9bfff}
 
 /* ---------- body / views ---------- */
 .gps-body{flex:1 1 auto;position:relative;min-height:0;display:flex;flex-direction:column}
@@ -318,6 +326,55 @@ const CSS = `
 .gps-dlg td:first-child{color:var(--on);white-space:nowrap;width:44%}
 .gps-kbd{display:inline-block;border:1px solid var(--outline);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:11px;color:var(--on);background:var(--sf2);margin-right:4px}
 
+/* ---------- scan menu ---------- */
+.gps-dlg.wide{width:min(94vw,600px)}
+.gps-dlg .gps-sec{display:flex;flex-direction:column;gap:8px}
+.gps-dlg .gps-sec>.lbl{font-size:12px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--outline-s)}
+.gps-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.gps-choice{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px;border-radius:14px;text-align:left;
+  background:var(--sf2);color:var(--on);border:2px solid transparent;position:relative;overflow:hidden;
+  transition:border-color var(--d-s) var(--e-std),background var(--d-s) var(--e-std)}
+.gps-choice::before{content:"";position:absolute;inset:0;background:currentColor;opacity:0;transition:opacity var(--d-s) var(--e-std)}
+.gps-choice:hover::before{opacity:.06}
+.gps-choice .ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:var(--sf3);color:var(--onv)}
+.gps-choice .tt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.gps-choice .tt b{font-size:14px;font-weight:650;line-height:18px}
+.gps-choice .tt .hint{font-size:12px;line-height:16px;color:var(--onv)}
+.gps-choice[aria-checked=true]{border-color:var(--pri);background:var(--pri-c);color:var(--on-pri-c)}
+.gps-choice[aria-checked=true] .ic{background:var(--pri);color:var(--on-pri)}
+.gps-choice[aria-checked=true] .tt .hint{color:var(--on-pri-c);opacity:.85}
+.gps-album-row{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:12px;background:var(--sf2);min-height:56px}
+.gps-album-row img,.gps-album-row .ph{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--sf3);flex:none;display:grid;place-items:center;color:var(--onv)}
+.gps-album-row .tt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.gps-album-row .tt b{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gps-album-row .tt .hint{font-size:12px;color:var(--onv)}
+.gps-filters-toggle{align-self:flex-start;padding:0 10px 0 8px;height:36px}
+.gps-filters-toggle .gps-badge{margin-left:2px;background:var(--pri);color:var(--on-pri)}
+.gps-filters{display:flex;flex-direction:column;gap:12px;padding:12px;border-radius:14px;background:var(--sf2)}
+.gps-filters .gps-daterange{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gps-filters label.row{margin:0;padding:4px 0}
+.gps-filters label.row:hover{background:none}
+.gps-dlg .gps-err{color:var(--err)}
+.gps-dlg .gps-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.gps-dlg .gps-foot label.row{margin:0;padding:4px 0;font-size:13px;color:var(--onv)}
+.gps-dlg .gps-foot label.row:hover{background:none}
+
+/* ---------- album picker ---------- */
+.gps-dlg input[type=search]{background:var(--sf);color:var(--on);border:1px solid var(--outline);border-radius:10px;padding:10px 12px;font:inherit;width:100%}
+.gps-albums{display:flex;flex-direction:column;gap:4px;max-height:min(46vh,420px);overflow:auto;overscroll-behavior:contain;margin:0 -8px;padding:0 8px}
+.gps-albums::-webkit-scrollbar{width:10px}
+.gps-albums::-webkit-scrollbar-thumb{background:var(--sf3);border-radius:5px;border:2px solid var(--sf1)}
+.gps-album{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:12px;text-align:left;width:100%;color:var(--on);position:relative;overflow:hidden}
+.gps-album::before{content:"";position:absolute;inset:0;background:currentColor;opacity:0;transition:opacity var(--d-s) var(--e-std)}
+.gps-album:hover::before{opacity:.07}
+.gps-album img,.gps-album .ph{width:48px;height:48px;border-radius:10px;object-fit:cover;background:var(--sf2);flex:none;display:grid;place-items:center;color:var(--onv)}
+.gps-album .tt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+.gps-album .tt b{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gps-album .tt .hint{font-size:12px;color:var(--onv)}
+.gps-album .sh{flex:none;height:22px;padding:0 8px;border-radius:11px;background:var(--ok-c);color:var(--on-ok-c);font-size:11px;font-weight:600;display:inline-flex;align-items:center}
+.gps-albums-status{padding:20px;gap:8px}
+.gps-albums-status .gps-spin{width:28px;height:28px}
+
 /* ---------- lightbox preview ---------- */
 .gps-light-box{position:absolute;inset:0;background:#000;z-index:11;display:flex;flex-direction:column;animation:gps-fade var(--d-s) var(--e-std) both}
 .gps-light-box .im{flex:1 1 auto;position:relative;min-height:0}
@@ -359,9 +416,21 @@ const CSS = `
 #gps-fab svg{width:24px;height:24px}
 #gps-fab .b{min-width:20px;height:20px;border-radius:10px;padding:0 6px;display:grid;place-items:center;background:#641d2b;color:#ffd9de;font-size:11px;font-weight:650}
 
+@media (max-width:1180px){
+  .gps-score-item .lbl{display:none}
+  .gps-mode{max-width:200px}
+}
+@media (max-width:980px){
+  .gps-brand .n{display:none}
+  .gps-brand{gap:0}
+}
 @media (max-width:720px){
   .gps-bar{height:58px;padding:0 4px 0 8px}
   .gps-brand .n{display:none}
+  .gps-mode{width:36px;padding:0;justify-content:center;gap:0}
+  .gps-mode .gps-mode-label{display:none}
+  .gps-cards{grid-template-columns:1fr}
+  .gps-choice{flex-direction:row;align-items:center}
   .gps-score{gap:3px}
   .gps-score-item{height:30px;padding:0 7px}
   .gps-score-item .lbl{display:none}
@@ -458,7 +527,7 @@ const STRINGS = {
     scanPausedTitle: 'Bu bölümde yeni fotoğraf bulunamadı',
     scanPausedSub: 'Uzun bir aralık tarandı. Kaldığın yerden devam etmek için tekrar dene.',
     doneTitle: 'Hepsi bitti',
-    doneSub: 'Bu kaynakta incelenmemiş fotoğraf kalmadı. Ayarlardan kaynağı ya da başlangıç tarihini değiştirebilirsin.',
+    doneSub: 'Burada incelenmemiş fotoğraf kalmadı. Tarama modundan sırayı, kaynağı ya da filtreleri değiştirebilirsin.',
     doneStats: 'Bu oturumda {k} tutuldu, {d} silindi.',
     errLoadTitle: 'Liste yüklenemedi',
     errLoadSub: 'Bağlantı ya da oturum sorunu olabilir.',
@@ -514,12 +583,50 @@ const STRINGS = {
     dismiss: 'Tamam',
     // pending on exit
     pendingExit: '{n} fotoğraf hâlâ silinmeyi bekliyor. Hiçbiri silinmedi; istediğin zaman geri gelip onaylayabilirsin.',
-    // settings
-    source: 'Kaynak', srcLib: 'Kütüphane', srcArchive: 'Arşiv', srcBoth: 'Kütüphane + Arşiv',
-    startDate: 'Başlangıç tarihi', startDateHint: 'Bu tarihten geriye doğru ilerler. Boş bırakırsan en yeniden başlar.',
+    // scan mode menu
+    scanMenuTitle: 'Nereden başlayalım?',
+    scanMode: 'Tarama modu',
+    scanOrder: 'Sıra',
+    orderNewest: 'Yeniden eskiye', orderNewestHint: 'En yeni fotoğraftan geriye doğru.',
+    orderOldest: 'Eskiden yeniye', orderOldestHint: 'En eski fotoğraftan bugüne doğru.',
+    orderRandom: 'Rastgele', orderRandomHint: 'Kütüphanenin farklı dönemlerinden karışık.',
+    source: 'Kaynak', srcLib: 'Kütüphane', srcArchive: 'Arşiv', srcBoth: 'Kütüphane + Arşiv', srcAlbum: 'Bir albüm',
+    pickAlbum: 'Albüm seç', changeAlbum: 'Değiştir', noAlbumPicked: 'Henüz albüm seçilmedi',
+    filters: 'Filtreler',
+    dateRange: 'Tarih aralığı', dateFrom: 'En eski', dateTo: 'En yeni',
+    dateRangeHint: 'İkisini de boş bırakırsan tüm zamanlar taranır.',
+    dateRangeInvalid: 'Başlangıç tarihi bitiş tarihinden sonra olamaz',
+    mediaType: 'Medya türü', mediaAll: 'Fotoğraflar ve videolar', mediaPhoto: 'Yalnızca fotoğraflar', mediaVideo: 'Yalnızca videolar',
     resume: 'Kaldığım yerden devam et',
-    skipVideos: 'Videoları atla',
+    resumeHint: 'Rastgele sırada uygulanmaz; karar verdiğin fotoğraflar zaten bir daha gösterilmez.',
     skipFav: 'Favorileri atla',
+    showStartMenu: 'Açılışta bu menüyü göster',
+    scanChipHint: 'Tarama modunu değiştir',
+    // album picker
+    albumSearch: 'Albüm ara',
+    albumCount: '{n} öğe',
+    albumShared: 'Paylaşılan',
+    albumSharedHint: 'Paylaşılan albümlerde yalnızca senin yüklediğin fotoğraflar gösterilir.',
+    albumsLoading: 'Albümler yükleniyor…',
+    albumsEmpty: 'Albüm bulunamadı',
+    albumsMore: 'Daha fazla',
+    albumsError: 'Albümler yüklenemedi',
+    albumLoading: 'Albüm yükleniyor… {i}/{n}',
+    albumLoadingN: 'Albüm yükleniyor… {i}',
+    albumGone: 'Albüm açılamadı — kütüphaneye dönüldü',
+    albumsLoadingN: 'Albümler yükleniyor… {n}',
+    albumEmptyTitle: 'Bu albümde gösterilecek fotoğraf yok',
+    albumEmptySub: 'Albümdeki fotoğrafların hepsine karar verilmiş ya da başkaları tarafından yüklenmiş.',
+    albumEmptySubPlain: 'Albümdeki fotoğrafların hepsine zaten karar verilmiş.',
+    pickAnotherAlbum: 'Başka albüm seç',
+    skipFavAlbumHint: 'Albümlerde kullanılamaz.',
+    oldestSearching: 'En eski fotoğraf aranıyor…',
+    randomSweep: 'Kalanlar taranıyor',
+    continueBtn: 'Devam et',
+    resumeSummary: 'Kaldığın yer: {d}. Buradan {dir} devam edilir.',
+    resumeBackward: 'geriye doğru',
+    resumeForward: 'ileriye doğru',
+    // settings
     reviewEvery: 'Kaç fotoğrafta bir inceleme istensin?',
     reviewEveryHint: '0 yazarsan otomatik sormaz; incelemeyi kendin başlatırsın.',
     theme: 'Görünüm', themeAuto: 'Sistemle aynı', themeDark: 'Koyu', themeLight: 'Açık',
@@ -535,6 +642,7 @@ const STRINGS = {
       ['R', 'İşaretlenenleri gözden geçir'],
       ['Boşluk / Enter', 'Google Fotoğraflar\'da aç'],
       ['V', 'Videoyu oynat / durdur'],
+      ['M', 'Tarama modu'],
       ['S', 'Ayarlar'],
       ['?', 'Bu pencere'],
       ['Esc', 'Kapat / geri'],
@@ -586,7 +694,7 @@ const STRINGS = {
     scanPausedTitle: 'No new photos found in this section',
     scanPausedSub: 'A long range was scanned. Retry to continue from where FolioPause stopped.',
     doneTitle: 'All done',
-    doneSub: 'No unreviewed photos left in this source. Change the source or start date in settings.',
+    doneSub: 'No unreviewed photos left here. Change the order, source or filters in the scan mode menu.',
     doneStats: 'This session: {k} kept, {d} deleted.',
     errLoadTitle: 'Could not load the list',
     errLoadSub: 'This may be a network or session problem.',
@@ -636,11 +744,47 @@ const STRINGS = {
     lockUnavailableBody: 'The browser could not provide the safe per-account tab lock. FolioPause will not show or change any photo because two tabs could otherwise race. Try again in a normal window with an up-to-date Chrome, Brave, or Edge.',
     dismiss: 'OK',
     pendingExit: '{n} photos are still waiting to be deleted. Nothing was deleted; come back any time to confirm.',
-    source: 'Source', srcLib: 'Library', srcArchive: 'Archive', srcBoth: 'Library + Archive',
-    startDate: 'Start date', startDateHint: 'Works backwards from this date. Leave empty to start from the newest.',
+    scanMenuTitle: 'Where should we start?',
+    scanMode: 'Scan mode',
+    scanOrder: 'Order',
+    orderNewest: 'Newest first', orderNewestHint: 'From the most recent photo backwards.',
+    orderOldest: 'Oldest first', orderOldestHint: 'From the oldest photo towards today.',
+    orderRandom: 'Random', orderRandomHint: 'Mixed from different periods of the library.',
+    source: 'Source', srcLib: 'Library', srcArchive: 'Archive', srcBoth: 'Library + Archive', srcAlbum: 'One album',
+    pickAlbum: 'Choose album', changeAlbum: 'Change', noAlbumPicked: 'No album chosen yet',
+    filters: 'Filters',
+    dateRange: 'Date range', dateFrom: 'From', dateTo: 'To',
+    dateRangeHint: 'Leave both empty to scan all time.',
+    dateRangeInvalid: 'The start date cannot be after the end date',
+    mediaType: 'Media type', mediaAll: 'Photos and videos', mediaPhoto: 'Photos only', mediaVideo: 'Videos only',
     resume: 'Resume where I left off',
-    skipVideos: 'Skip videos',
+    resumeHint: 'Not used in random order; photos you already decided on are never shown again anyway.',
     skipFav: 'Skip favorites',
+    showStartMenu: 'Show this menu on start',
+    scanChipHint: 'Change the scan mode',
+    albumSearch: 'Search albums',
+    albumCount: '{n} items',
+    albumShared: 'Shared',
+    albumSharedHint: 'In shared albums only the photos you uploaded are shown.',
+    albumsLoading: 'Loading albums…',
+    albumsEmpty: 'No albums found',
+    albumsMore: 'Load more',
+    albumsError: 'Could not load albums',
+    albumLoading: 'Loading album… {i}/{n}',
+    albumLoadingN: 'Loading album… {i}',
+    albumGone: 'The album could not be opened — back to the library',
+    albumsLoadingN: 'Loading albums… {n}',
+    albumEmptyTitle: 'Nothing to show in this album',
+    albumEmptySub: 'Every photo in it has a decision already, or was uploaded by someone else.',
+    albumEmptySubPlain: 'Every photo in it has a decision already.',
+    pickAnotherAlbum: 'Choose another album',
+    skipFavAlbumHint: 'Not available for albums.',
+    oldestSearching: 'Finding the oldest photo…',
+    randomSweep: 'Sweeping what is left',
+    continueBtn: 'Continue',
+    resumeSummary: 'Picking up from {d}, {dir}.',
+    resumeBackward: 'going back in time',
+    resumeForward: 'going forward in time',
     reviewEvery: 'Ask me to review every N photos',
     reviewEveryHint: 'Set 0 to never ask automatically; you start the review yourself.',
     theme: 'Appearance', themeAuto: 'Match system', themeDark: 'Dark', themeLight: 'Light',
@@ -655,6 +799,7 @@ const STRINGS = {
       ['R', 'Review marked photos'],
       ['Space / Enter', 'Open in Google Photos'],
       ['V', 'Play / pause video'],
+      ['M', 'Scan mode'],
       ['S', 'Settings'],
       ['?', 'This dialog'],
       ['Esc', 'Close / back'],
@@ -726,7 +871,7 @@ STRINGS.it = {
   scanPausedTitle: 'Nessuna nuova foto trovata in questa sezione',
   scanPausedSub: 'È stato analizzato un intervallo lungo. Riprova per continuare dal punto in cui FolioPause si è fermato.',
   doneTitle: 'Tutto fatto',
-  doneSub: 'Non ci sono più foto da esaminare in questa fonte. Modifica la fonte o la data di inizio nelle impostazioni.',
+  doneSub: 'Non ci sono più foto da esaminare qui. Cambia ordine, fonte o filtri dal menu della modalità di scansione.',
   doneStats: 'In questa sessione: {k} conservate, {d} eliminate.',
   errLoadTitle: 'Impossibile caricare l\'elenco',
   errLoadSub: 'Potrebbe esserci un problema di rete o di sessione.',
@@ -770,11 +915,47 @@ STRINGS.it = {
   lockUnavailableBody: 'Il browser non ha fornito il blocco sicuro per questo account. FolioPause non mostrerà né modificherà foto perché due schede potrebbero entrare in conflitto. Riprova in una finestra normale con Chrome, Brave o Edge aggiornato.',
   dismiss: 'OK',
   pendingExit: '{n} foto sono ancora in attesa di essere eliminate. Non è stato eliminato nulla; puoi tornare in qualsiasi momento per confermare.',
-  source: 'Fonte', srcLib: 'Raccolta', srcArchive: 'Archivio', srcBoth: 'Raccolta + Archivio',
-  startDate: 'Data di inizio', startDateHint: 'Procede a ritroso a partire da questa data. Lascia vuoto per iniziare dalla foto più recente.',
+  scanMenuTitle: 'Da dove cominciamo?',
+  scanMode: 'Modalità di scansione',
+  scanOrder: 'Ordine',
+  orderNewest: 'Dalle più recenti', orderNewestHint: 'Dalla foto più recente a ritroso.',
+  orderOldest: 'Dalle più vecchie', orderOldestHint: 'Dalla foto più vecchia verso oggi.',
+  orderRandom: 'Casuale', orderRandomHint: 'Un misto di periodi diversi della raccolta.',
+  source: 'Fonte', srcLib: 'Raccolta', srcArchive: 'Archivio', srcBoth: 'Raccolta + Archivio', srcAlbum: 'Un album',
+  pickAlbum: 'Scegli album', changeAlbum: 'Cambia', noAlbumPicked: 'Nessun album scelto',
+  filters: 'Filtri',
+  dateRange: 'Intervallo di date', dateFrom: 'Dal', dateTo: 'Al',
+  dateRangeHint: 'Lascia entrambi vuoti per esaminare tutto.',
+  dateRangeInvalid: 'La data di inizio non può essere successiva a quella di fine',
+  mediaType: 'Tipo di contenuto', mediaAll: 'Foto e video', mediaPhoto: 'Solo foto', mediaVideo: 'Solo video',
   resume: 'Riprendi da dove avevo interrotto',
-  skipVideos: 'Salta i video',
+  resumeHint: 'Non si applica all\'ordine casuale; le foto già decise non vengono comunque più mostrate.',
   skipFav: 'Salta le preferite',
+  showStartMenu: 'Mostra questo menu all\'avvio',
+  scanChipHint: 'Cambia la modalità di scansione',
+  albumSearch: 'Cerca album',
+  albumCount: '{n} elementi',
+  albumShared: 'Condiviso',
+  albumSharedHint: 'Negli album condivisi vengono mostrate solo le foto caricate da te.',
+  albumsLoading: 'Caricamento degli album…',
+  albumsEmpty: 'Nessun album trovato',
+  albumsMore: 'Carica altri',
+  albumsError: 'Impossibile caricare gli album',
+  albumLoading: 'Caricamento dell\'album… {i}/{n}',
+  albumLoadingN: 'Caricamento dell\'album… {i}',
+  albumGone: 'Impossibile aprire l\'album — di nuovo nella raccolta',
+  albumsLoadingN: 'Caricamento degli album… {n}',
+  albumEmptyTitle: 'Niente da mostrare in questo album',
+  albumEmptySub: 'Ogni foto ha già una decisione oppure è stata caricata da qualcun altro.',
+  albumEmptySubPlain: 'Ogni foto ha già una decisione.',
+  pickAnotherAlbum: 'Scegli un altro album',
+  skipFavAlbumHint: 'Non disponibile per gli album.',
+  oldestSearching: 'Ricerca della foto più vecchia…',
+  randomSweep: 'Esame delle foto rimaste',
+  continueBtn: 'Continua',
+  resumeSummary: 'Si riprende dal {d}, {dir}.',
+  resumeBackward: 'andando indietro nel tempo',
+  resumeForward: 'andando avanti nel tempo',
   reviewEvery: 'Chiedimi di rivedere ogni N foto',
   reviewEveryHint: 'Imposta 0 per non ricevere richieste automatiche; avvierai tu la revisione.',
   theme: 'Aspetto', themeAuto: 'Come il sistema', themeDark: 'Scuro', themeLight: 'Chiaro',
@@ -789,6 +970,7 @@ STRINGS.it = {
     ['R', 'Rivedi le foto contrassegnate'],
     ['Spazio / Invio', 'Apri in Google Foto'],
     ['V', 'Riproduci / metti in pausa il video'],
+    ['M', 'Modalità di scansione'],
     ['S', 'Impostazioni'],
     ['?', 'Questa finestra'],
     ['Esc', 'Chiudi / indietro'],
@@ -845,7 +1027,7 @@ STRINGS.es = {
   scanPausedTitle: 'No se encontraron fotos nuevas en esta sección',
   scanPausedSub: 'Se analizó un intervalo largo. Reintenta para continuar desde donde se detuvo FolioPause.',
   doneTitle: 'Todo listo',
-  doneSub: 'No quedan fotos sin revisar en esta fuente. Cambia la fuente o la fecha de inicio en los ajustes.',
+  doneSub: 'No quedan fotos sin revisar aquí. Cambia el orden, la fuente o los filtros en el menú del modo de exploración.',
   doneStats: 'En esta sesión: {k} conservadas, {d} eliminadas.',
   errLoadTitle: 'No se pudo cargar la lista',
   errLoadSub: 'Puede deberse a un problema de red o de sesión.',
@@ -889,10 +1071,46 @@ STRINGS.es = {
   lockUnavailableBody: 'El navegador no pudo proporcionar el bloqueo seguro para esta cuenta. FolioPause no mostrará ni modificará fotos porque dos pestañas podrían entrar en conflicto. Vuelve a intentarlo en una ventana normal con Chrome, Brave o Edge actualizado.',
   dismiss: 'Aceptar',
   pendingExit: '{n} fotos siguen esperando para eliminarse. No se ha eliminado nada; vuelve cuando quieras para confirmar.',
-  source: 'Fuente', srcLib: 'Biblioteca', srcArchive: 'Archivo', srcBoth: 'Biblioteca + Archivo',
-  startDate: 'Fecha de inicio', startDateHint: 'Avanza hacia atrás desde esta fecha. Déjala vacía para empezar por la foto más reciente.',
+  scanMenuTitle: '¿Por dónde empezamos?',
+  scanMode: 'Modo de exploración',
+  scanOrder: 'Orden',
+  orderNewest: 'De más reciente a más antigua', orderNewestHint: 'Desde la foto más reciente hacia atrás.',
+  orderOldest: 'De más antigua a más reciente', orderOldestHint: 'Desde la foto más antigua hacia hoy.',
+  orderRandom: 'Aleatorio', orderRandomHint: 'Mezcla de distintas épocas de la biblioteca.',
+  source: 'Fuente', srcLib: 'Biblioteca', srcArchive: 'Archivo', srcBoth: 'Biblioteca + Archivo', srcAlbum: 'Un álbum',
+  pickAlbum: 'Elegir álbum', changeAlbum: 'Cambiar', noAlbumPicked: 'Aún no has elegido un álbum',
+  filters: 'Filtros',
+  dateRange: 'Intervalo de fechas', dateFrom: 'Desde', dateTo: 'Hasta',
+  dateRangeHint: 'Deja ambos vacíos para revisar todo.',
+  dateRangeInvalid: 'La fecha de inicio no puede ser posterior a la de fin',
+  mediaType: 'Tipo de contenido', mediaAll: 'Fotos y vídeos', mediaPhoto: 'Solo fotos', mediaVideo: 'Solo vídeos',
+  resumeHint: 'No se aplica al orden aleatorio; las fotos ya decididas no vuelven a mostrarse de todos modos.',
+  showStartMenu: 'Mostrar este menú al abrir',
+  scanChipHint: 'Cambiar el modo de exploración',
+  albumSearch: 'Buscar álbumes',
+  albumCount: '{n} elementos',
+  albumShared: 'Compartido',
+  albumSharedHint: 'En los álbumes compartidos solo se muestran las fotos que subiste tú.',
+  albumsLoading: 'Cargando álbumes…',
+  albumsEmpty: 'No se han encontrado álbumes',
+  albumsMore: 'Cargar más',
+  albumsError: 'No se pudieron cargar los álbumes',
+  albumLoading: 'Cargando álbum… {i}/{n}',
+  albumLoadingN: 'Cargando álbum… {i}',
+  albumGone: 'No se pudo abrir el álbum; de vuelta a la biblioteca',
+  albumsLoadingN: 'Cargando álbumes… {n}',
+  albumEmptyTitle: 'No hay nada que mostrar en este álbum',
+  albumEmptySub: 'Todas sus fotos ya tienen una decisión o las subió otra persona.',
+  albumEmptySubPlain: 'Todas sus fotos ya tienen una decisión.',
+  pickAnotherAlbum: 'Elegir otro álbum',
+  skipFavAlbumHint: 'No disponible en álbumes.',
+  oldestSearching: 'Buscando la foto más antigua…',
+  randomSweep: 'Revisando lo que queda',
+  continueBtn: 'Continuar',
+  resumeSummary: 'Se retoma desde el {d}, {dir}.',
+  resumeBackward: 'hacia atrás en el tiempo',
+  resumeForward: 'hacia delante en el tiempo',
   resume: 'Continuar donde lo dejé',
-  skipVideos: 'Omitir vídeos',
   skipFav: 'Omitir favoritas',
   reviewEvery: 'Pedirme revisar cada N fotos',
   reviewEveryHint: 'Usa 0 para que nunca se solicite automáticamente; tú iniciarás la revisión.',
@@ -908,6 +1126,7 @@ STRINGS.es = {
     ['R', 'Revisar las fotos marcadas'],
     ['Espacio / Intro', 'Abrir en Google Fotos'],
     ['V', 'Reproducir / pausar vídeo'],
+    ['M', 'Modo de exploración'],
     ['S', 'Ajustes'],
     ['?', 'Este cuadro de diálogo'],
     ['Esc', 'Cerrar / volver'],
@@ -964,7 +1183,7 @@ STRINGS.de = {
   scanPausedTitle: 'In diesem Abschnitt wurden keine neuen Fotos gefunden',
   scanPausedSub: 'Ein langer Bereich wurde durchsucht. Versuche es erneut, um dort fortzufahren, wo FolioPause angehalten hat.',
   doneTitle: 'Alles erledigt',
-  doneSub: 'In dieser Quelle sind keine ungeprüften Fotos mehr vorhanden. Ändere die Quelle oder das Startdatum in den Einstellungen.',
+  doneSub: 'Hier sind keine ungeprüften Fotos mehr vorhanden. Ändere Reihenfolge, Quelle oder Filter im Menü des Durchlaufmodus.',
   doneStats: 'In dieser Sitzung: {k} behalten, {d} gelöscht.',
   errLoadTitle: 'Die Liste konnte nicht geladen werden',
   errLoadSub: 'Möglicherweise liegt ein Netzwerk- oder Sitzungsproblem vor.',
@@ -1008,10 +1227,46 @@ STRINGS.de = {
   lockUnavailableBody: 'Der Browser konnte die sichere Sperre für dieses Konto nicht bereitstellen. FolioPause zeigt oder ändert keine Fotos, da sonst zwei Tabs in Konflikt geraten könnten. Versuche es in einem normalen Fenster mit aktuellem Chrome, Brave oder Edge erneut.',
   dismiss: 'OK',
   pendingExit: '{n} Fotos warten noch auf das Löschen. Es wurde nichts gelöscht; du kannst jederzeit zurückkommen und bestätigen.',
-  source: 'Quelle', srcLib: 'Mediathek', srcArchive: 'Archiv', srcBoth: 'Mediathek + Archiv',
-  startDate: 'Startdatum', startDateHint: 'Ab diesem Datum wird rückwärts gearbeitet. Leer lassen, um beim neuesten Foto zu beginnen.',
+  scanMenuTitle: 'Wo fangen wir an?',
+  scanMode: 'Durchlaufmodus',
+  scanOrder: 'Reihenfolge',
+  orderNewest: 'Neueste zuerst', orderNewestHint: 'Vom neuesten Foto rückwärts.',
+  orderOldest: 'Älteste zuerst', orderOldestHint: 'Vom ältesten Foto bis heute.',
+  orderRandom: 'Zufällig', orderRandomHint: 'Gemischt aus verschiedenen Zeiten der Mediathek.',
+  source: 'Quelle', srcLib: 'Mediathek', srcArchive: 'Archiv', srcBoth: 'Mediathek + Archiv', srcAlbum: 'Ein Album',
+  pickAlbum: 'Album wählen', changeAlbum: 'Ändern', noAlbumPicked: 'Noch kein Album gewählt',
+  filters: 'Filter',
+  dateRange: 'Zeitraum', dateFrom: 'Von', dateTo: 'Bis',
+  dateRangeHint: 'Beide leer lassen, um alles zu durchsuchen.',
+  dateRangeInvalid: 'Das Startdatum darf nicht nach dem Enddatum liegen',
+  mediaType: 'Medientyp', mediaAll: 'Fotos und Videos', mediaPhoto: 'Nur Fotos', mediaVideo: 'Nur Videos',
+  resumeHint: 'Gilt nicht bei zufälliger Reihenfolge; bereits entschiedene Fotos erscheinen ohnehin nicht mehr.',
+  showStartMenu: 'Dieses Menü beim Start anzeigen',
+  scanChipHint: 'Durchlaufmodus ändern',
+  albumSearch: 'Alben durchsuchen',
+  albumCount: '{n} Elemente',
+  albumShared: 'Geteilt',
+  albumSharedHint: 'In geteilten Alben werden nur die von dir hochgeladenen Fotos angezeigt.',
+  albumsLoading: 'Alben werden geladen…',
+  albumsEmpty: 'Keine Alben gefunden',
+  albumsMore: 'Mehr laden',
+  albumsError: 'Alben konnten nicht geladen werden',
+  albumLoading: 'Album wird geladen… {i}/{n}',
+  albumLoadingN: 'Album wird geladen… {i}',
+  albumGone: 'Album konnte nicht geöffnet werden – zurück zur Mediathek',
+  albumsLoadingN: 'Alben werden geladen… {n}',
+  albumEmptyTitle: 'In diesem Album gibt es nichts zu zeigen',
+  albumEmptySub: 'Jedes Foto darin ist bereits entschieden oder wurde von jemand anderem hochgeladen.',
+  albumEmptySubPlain: 'Jedes Foto darin ist bereits entschieden.',
+  pickAnotherAlbum: 'Anderes Album wählen',
+  skipFavAlbumHint: 'Bei Alben nicht verfügbar.',
+  oldestSearching: 'Ältestes Foto wird gesucht…',
+  randomSweep: 'Rest wird durchgesehen',
+  continueBtn: 'Weiter',
+  resumeSummary: 'Weiter ab {d}, {dir}.',
+  resumeBackward: 'rückwärts in der Zeit',
+  resumeForward: 'vorwärts in der Zeit',
   resume: 'Dort fortfahren, wo ich aufgehört habe',
-  skipVideos: 'Videos überspringen',
   skipFav: 'Favoriten überspringen',
   reviewEvery: 'Nach jeweils N Fotos zur Prüfung auffordern',
   reviewEveryHint: 'Bei 0 wird nie automatisch gefragt; du startest die Prüfung selbst.',
@@ -1027,6 +1282,7 @@ STRINGS.de = {
     ['R', 'Markierte Fotos prüfen'],
     ['Leertaste / Eingabetaste', 'In Google Fotos öffnen'],
     ['V', 'Video abspielen / pausieren'],
+    ['M', 'Durchlaufmodus'],
     ['S', 'Einstellungen'],
     ['?', 'Dieses Dialogfeld'],
     ['Esc', 'Schließen / zurück'],
@@ -1133,6 +1389,14 @@ const ICONS = {
   stack: ['M7.5 3.5h9a2 2 0 012 2v13a2 2 0 01-2 2h-9a2 2 0 01-2-2v-13a2 2 0 012-2z', 'M20.5 7v10', 'M3.5 7v10'],
   swipe: ['M13.5 3.5h5a2 2 0 012 2v13a2 2 0 01-2 2h-5', 'M9.5 20.5h-4a2 2 0 01-2-2v-13a2 2 0 012-2h4', 'M11.5 8.5L8 12l3.5 3.5'],
   info: ['M12 3.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17z', 'M12 11v6', 'M12 7.6v.02'],
+  // scan orders: bars shrinking downwards (newest first), growing downwards
+  // (oldest first), crossing paths (random)
+  sortNew: ['M4 6h11', 'M4 12h8', 'M4 18h5', 'M17.5 5v14', 'M14 15.5l3.5 3.5 3.5-3.5'],
+  sortOld: ['M4 6h5', 'M4 12h8', 'M4 18h11', 'M17.5 19V5', 'M14 8.5L17.5 5 21 8.5'],
+  shuffle: ['M4 6.5h2.6c1.4 0 2.6.7 3.4 1.8l4 7.4c.8 1.1 2 1.8 3.4 1.8H20', 'M17.5 15l2.5 2.5-2.5 2.5', 'M20 6.5h-2.6c-1.4 0-2.6.7-3.4 1.8l-.8 1.5', 'M17.5 4L20 6.5 17.5 9', 'M4 17.5h2.6c1.4 0 2.6-.7 3.4-1.8l.8-1.5'],
+  album: ['M6 4.5h12a1.5 1.5 0 011.5 1.5v12a1.5 1.5 0 01-1.5 1.5H6A1.5 1.5 0 014.5 18V6A1.5 1.5 0 016 4.5z', 'M8.5 4.5v15', 'M12.3 10.2l3.2 1.9-3.2 1.9z'],
+  calendar: ['M4.5 6.5h15v13h-15z', 'M4.5 10.5h15', 'M8.5 4v4', 'M15.5 4v4'],
+  compass: ['M12 3.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17z', 'M15.2 8.8l-1.8 4.6-4.6 1.8 1.8-4.6z'],
 };
 
 function icon(name, size) {
@@ -1229,7 +1493,8 @@ const fmtNum = (n) => { try { return n.toLocaleString(LANGUAGE_LOCALES[LANG] || 
 //
 //   lcxiM   list library by taken date      XwAOJf  move to trash / restore
 //   VrseUb  item info (incl. trash stamp)   zy0IHe  list trash
-//   EWgK9e  bulk media info (name + size)
+//   EWgK9e  bulk media info (name + size)   Z5xsfc  list albums
+//   snAcKc  list one album's contents
 // ---------------------------------------------------------------------------
 
 const WIZ = window.WIZ_global_data || {};
@@ -1340,6 +1605,34 @@ function parseItem(d) {
     isLive: !!ext[146008172],
     isFavorite: !!(ext[163238866] && ext[163238866][0] === true),
     place: place,
+    // Who uploaded it. Only meaningful inside a shared album, where rows
+    // added by other people sit next to the user's own.
+    ownerActor: actorOf(d[6]),
+  };
+}
+
+const actorOf = (v) => (Array.isArray(v) && typeof v[0] === 'string' && v[0] ? v[0] : null);
+
+// An album row from `Z5xsfc`. Its descriptive block sits under key 72930366 in
+// the trailing object: [kind, title, [timestamps…], itemCount, isShared,
+// authKey, …]. kind 1 is an album the user made (possibly shared out); kind 4
+// is one somebody else shared with them, whose rows are not in this library.
+function parseAlbum(d) {
+  if (!Array.isArray(d) || typeof d[0] !== 'string' || !d[0]) return null;
+  const meta = extOf(d)[72930366];
+  if (!Array.isArray(meta)) return null;
+  const range = Array.isArray(meta[2]) ? meta[2] : [];
+  return {
+    mediaKey: d[0],
+    thumb: d[1] && typeof d[1][0] === 'string' ? d[1][0] : null,
+    ownerActor: actorOf(d[6]),
+    kind: typeof meta[0] === 'number' ? meta[0] : null,
+    title: typeof meta[1] === 'string' ? meta[1] : '',
+    itemCount: typeof meta[3] === 'number' ? meta[3] : null,
+    isShared: meta[4] === true,
+    authKey: typeof meta[5] === 'string' && meta[5] ? meta[5] : null,
+    startTs: numTs(range[0]),
+    endTs: numTs(range[1]),
   };
 }
 
@@ -1383,6 +1676,48 @@ const api = {
       rawItemCount: rows.length,
       nextPageId: (r && r[1]) || null,
       lastItemTimestamp: r && r[2] != null && Number.isFinite(Number(r[2])) ? Number(r[2]) : null,
+    };
+  },
+
+  // Albums the account can see, newest activity first, 100 per page. Read
+  // only: the scan menu lets the user pick one as the source.
+  async listAlbums(o) {
+    o = o || {};
+    const r = await rpc(
+      'Z5xsfc',
+      [o.pageId || null, null, null, null, 1, null, null, o.pageSize || 100, [2], 5],
+      { retries: 2, timeoutMs: 10000 }
+    );
+    if (!Array.isArray(r) || (r[0] != null && !Array.isArray(r[0]))) throw new Error('unexpected albums response');
+    const rows = r[0] || [];
+    return {
+      albums: rows.map(parseAlbum).filter(Boolean),
+      rawItemCount: rows.length,
+      nextPageId: typeof r[1] === 'string' && r[1] ? r[1] : null,
+    };
+  },
+
+  // One page of an album's contents. Rows use the library row layout, so the
+  // same parser applies. Unlike the library listing, the final page carries an
+  // empty-string continuation token rather than null; both mean "done".
+  async listAlbumPage(albumKey, o) {
+    o = o || {};
+    if (!validRpcKey(albumKey)) throw new Error('invalid album key');
+    const r = await rpc(
+      'snAcKc',
+      [albumKey, o.pageId || null, null, o.authKey || null],
+      { retries: 2, timeoutMs: 10000 }
+    );
+    if (!Array.isArray(r) || (r[1] != null && !Array.isArray(r[1]))) throw new Error('unexpected album response');
+    const rows = r[1] || [];
+    const meta = Array.isArray(r[3]) ? r[3] : [];
+    return {
+      items: rows.map(parseItem).filter(Boolean),
+      rawItemCount: rows.length,
+      nextPageId: typeof r[2] === 'string' && r[2] ? r[2] : null,
+      title: typeof meta[1] === 'string' ? meta[1] : '',
+      ownerActor: actorOf(meta[5]),
+      itemCount: typeof meta[21] === 'number' ? meta[21] : null,
     };
   },
 
@@ -1444,17 +1779,26 @@ const api = {
   // Media keys currently sitting in Trash. Continue until the requested keys
   // have all been found or Google says there is no next page; a large existing
   // Trash must not make a newly deleted photo look unverified by accident.
+  // `want` may hold items; a wanted item counts as found by either of its
+  // identifiers, since a trash row carries the library mediaKey at [0] and the
+  // dedupKey at [3] while an album-sourced item only shares the latter.
   async trashKeys(opts) {
     opts = opts || {};
-    const want = new Set(opts.want || []);
+    const want = (opts.want || []).map((w) => (typeof w === 'string' ? { mediaKey: w } : w));
     const out = new Set();
+    const dedup = new Set();
+    Object.defineProperty(out, 'dedup', { value: dedup, enumerable: false });
     const seenTokens = new Set();
     let pageId = null;
     let complete = false;
     for (let page = 0; page < 100; page++) {
       const r = await rpc('zy0IHe', [pageId], opts);
-      ((r && r[0]) || []).forEach((row) => { if (row && row[0]) out.add(row[0]); });
-      if (!opts.scanAll && want.size && Array.from(want).every((k) => out.has(k))) break;
+      ((r && r[0]) || []).forEach((row) => {
+        if (!Array.isArray(row)) return;
+        if (typeof row[0] === 'string' && row[0]) out.add(row[0]);
+        if (typeof row[3] === 'string' && row[3]) dedup.add(row[3]);
+      });
+      if (!opts.scanAll && want.length && want.every((w) => inTrash(out, w))) break;
       const next = (r && r[1]) || null;
       if (!next) { complete = true; break; }
       if (seenTokens.has(String(next))) throw new Error('trash pagination token repeated');
@@ -1481,6 +1825,13 @@ const api = {
     return out;
   },
 };
+
+// Whether a trash listing from trashKeys() holds this photo, by either identifier.
+function inTrash(keys, item) {
+  if (!keys || !item) return false;
+  if (typeof item.mediaKey === 'string' && keys.has(item.mediaKey)) return true;
+  return !!(keys.dedup && typeof item.dedupKey === 'string' && keys.dedup.has(item.dedupKey));
+}
 
 // image / video URLs served by Google's own CDN for this session
 const imgUrl = (it, size) => it.thumb + '=w' + size + '-h' + size + '-k-no';
@@ -1592,7 +1943,8 @@ function playVideoIn(host, item, before, onState) {
   return ctl;
 }
 
-const photoPageUrl = (it) => BASE + 'photo/' + it.mediaKey;
+// An album row's key only resolves inside its album.
+const photoPageUrl = (it) => (it.albumKey ? BASE + 'album/' + it.albumKey + '/photo/' + it.mediaKey : BASE + 'photo/' + it.mediaKey);
 const trashPageUrl = () => BASE + 'trash';
 
 // ---------------------------------------------------------------------------
@@ -1617,31 +1969,70 @@ const IDB_VERSION = 2;
 const STORE_TIMEOUT_MS = 5000;
 const LOCK_TIMEOUT_MS = 5000;
 
+const SCAN_ORDERS = ['newest', 'oldest', 'random'];
+const MEDIA_TYPES = ['all', 'photo', 'video'];
+
 const DEFAULTS = {
   settings: {
-    source: 1,            // 1 library · 2 archive · 3 both
-    startDate: '',
-    resume: true,
-    skipVideos: false,
+    // --- what the scan covers; changing any of these restarts the feed ---
+    order: 'newest',      // newest · oldest · random
+    source: 1,            // 1 library · 2 archive · 3 both (ignored while an album is chosen)
+    albumKey: null,       // scan one album instead of the library
+    albumTitle: '',
+    albumAuthKey: null,
+    albumOwner: null,     // the album owner's actor id, i.e. the user's own
+    dateFrom: '',         // oldest day to include, YYYY-MM-DD ('' = no bound)
+    dateTo: '',           // newest day to include, YYYY-MM-DD ('' = no bound)
+    mediaType: 'all',     // all · photo · video
     skipFav: false,
+    resume: true,         // sequential orders continue from the last undecided photo
+    showStartMenu: true,  // offer the scan menu every time the app opens
+    // --- everything else ---
     reviewEvery: 100,     // ask for a review after this many decisions (0 = never ask)
     theme: 'auto',        // auto · dark · light
     language: 'auto',     // auto · tr · en · it · es · de
     dryRun: false,        // run the whole flow but never send a delete request
   },
   stats: { kept: 0, deleted: 0, freedBytes: 0 },
-  cursorTs: null,         // resume position: newest still-undecided timestamp
+  cursorTs: null,         // resume position, newest first: the newest still-undecided timestamp (inclusive upper bound)
+  cursorFloorTs: null,    // resume position, oldest first: every photo at or below this has a decision
+  floorTs: null,          // hint only: a timestamp the library had nothing at or below, last time we looked
   sinceReview: 0,
   introSeen: false,
 };
+
+const isDay = (v) => typeof v === 'string' && (v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v));
 
 function readState() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(LS_STATE) || '{}') || {}; } catch (e) { saved = {}; }
   const s = Object.assign({}, DEFAULTS, saved);
-  s.settings = Object.assign({}, DEFAULTS.settings, saved.settings || {});
+  const legacy = saved.settings && typeof saved.settings === 'object' ? saved.settings : {};
+  s.settings = Object.assign({}, DEFAULTS.settings, legacy);
+  // Settings written before the scan menu existed: the single start date was
+  // an upper bound, and "skip videos" is now the photos-only media type.
+  if (!('dateTo' in legacy) && isDay(legacy.startDate)) s.settings.dateTo = legacy.startDate;
+  if (!('mediaType' in legacy) && legacy.skipVideos === true) s.settings.mediaType = 'photo';
+  delete s.settings.startDate;
+  delete s.settings.skipVideos;
+  if (SCAN_ORDERS.indexOf(s.settings.order) === -1) s.settings.order = 'newest';
+  if (MEDIA_TYPES.indexOf(s.settings.mediaType) === -1) s.settings.mediaType = 'all';
+  if ([1, 2, 3].indexOf(s.settings.source) === -1) s.settings.source = 1;
+  if (!isDay(s.settings.dateFrom)) s.settings.dateFrom = '';
+  if (!isDay(s.settings.dateTo)) s.settings.dateTo = '';
+  if (typeof s.settings.albumKey !== 'string' || !s.settings.albumKey) {
+    s.settings.albumKey = null; s.settings.albumTitle = ''; s.settings.albumAuthKey = null; s.settings.albumOwner = null;
+  }
+  if (typeof s.settings.albumTitle !== 'string') s.settings.albumTitle = '';
+  for (const k of ['albumAuthKey', 'albumOwner']) {
+    if (typeof s.settings[k] !== 'string' || !s.settings[k]) s.settings[k] = null;
+  }
+  s.settings.showStartMenu = s.settings.showStartMenu !== false;
   s.stats = Object.assign({}, DEFAULTS.stats, saved.stats || {});
   if (typeof s.sinceReview !== 'number' || s.sinceReview < 0) s.sinceReview = 0;
+  for (const k of ['cursorTs', 'cursorFloorTs', 'floorTs']) {
+    if (typeof s[k] !== 'number' || !Number.isFinite(s[k])) s[k] = null;
+  }
   return s;
 }
 
@@ -1656,8 +2047,57 @@ function reloadState() {
   Object.assign(state, fresh);
 }
 
+// A photo has two identifiers: its `mediaKey`, which differs between the
+// library listing and an album listing of the very same photo, and its
+// `dedupKey`, which is the same everywhere and is what the trash RPC takes.
+// Decisions are therefore recorded under both, so a photo kept or marked in one
+// scan cannot be offered again from another.
 const kept = new Set();         // mediaKey -> decided "keep"
-const marked = new Map();       // mediaKey -> item, waiting for the user to confirm deletion
+const keptDedupOf = new Map();  // kept mediaKey -> its dedupKey, when known (rows store it as their value)
+const keptDedup = new Map();    // dedupKey -> how many kept rows carry it
+const DEDUP_PREFIX = 'd:';      // namespaces dedup keys where they share a set with media keys
+const dedupOf = (item) => (item && typeof item.dedupKey === 'string' && item.dedupKey ? item.dedupKey : null);
+
+class MarkedMap extends Map {
+  constructor() { super(); this.byDedup = new Map(); }   // dedupKey -> mediaKey
+  set(key, item) {
+    const prev = super.get(key);
+    if (prev && prev.dedupKey && this.byDedup.get(prev.dedupKey) === key) this.byDedup.delete(prev.dedupKey);
+    super.set(key, item);
+    if (item && item.dedupKey) this.byDedup.set(item.dedupKey, key);
+    return this;
+  }
+  delete(key) {
+    const prev = super.get(key);
+    if (prev && prev.dedupKey && this.byDedup.get(prev.dedupKey) === key) this.byDedup.delete(prev.dedupKey);
+    return super.delete(key);
+  }
+  clear() { super.clear(); this.byDedup.clear(); }
+  hasDedup(dedupKey) { return typeof dedupKey === 'string' && this.byDedup.has(dedupKey); }
+}
+const marked = new MarkedMap(); // mediaKey -> item, waiting for the user to confirm deletion
+
+// True when this photo (by either identifier) already has a decision.
+const isKept = (item) => !!item && (kept.has(item.mediaKey) || (typeof item.dedupKey === 'string' && keptDedup.has(item.dedupKey)));
+function keptAdd(mediaKey, dedupKey) {
+  kept.add(mediaKey);
+  if (!dedupKey || keptDedupOf.get(mediaKey) === dedupKey) return;
+  const old = keptDedupOf.get(mediaKey);
+  if (old) keptDedupDrop(old);
+  keptDedupOf.set(mediaKey, dedupKey);
+  keptDedup.set(dedupKey, (keptDedup.get(dedupKey) || 0) + 1);
+}
+function keptDedupDrop(dedupKey) {
+  const n = (keptDedup.get(dedupKey) || 0) - 1;
+  if (n > 0) keptDedup.set(dedupKey, n); else keptDedup.delete(dedupKey);
+}
+function keptRemove(mediaKey) {
+  kept.delete(mediaKey);
+  const d = keptDedupOf.get(mediaKey);
+  if (d) { keptDedupOf.delete(mediaKey); keptDedupDrop(d); }
+}
+function keptClearAll() { kept.clear(); keptDedupOf.clear(); keptDedup.clear(); }
+const isMarked = (item) => !!item && (marked.has(item.mediaKey) || marked.hasDedup(item.dedupKey));
 
 let persistTimer = null;
 function persist(now) {
@@ -1869,8 +2309,12 @@ const store = {
 
   async refresh() {
     this._assertUsable();
-    const nextKept = new Set();
+    const nextKept = [];   // [mediaKey, dedupKey|null]
     const nextMarked = new Map();
+    const acceptKept = (k, v) => {
+      if (!validRpcKey(k)) throw new Error('invalid local kept row');
+      nextKept.push([k, typeof v === 'string' && validRpcKey(v) ? v : null]);
+    };
     const acceptMarked = (it) => {
       if (!validMarkedItem(it) || nextMarked.has(it.mediaKey)) throw new Error('invalid local marked row');
       nextMarked.set(it.mediaKey, it);
@@ -1880,17 +2324,23 @@ const store = {
       // which is why the UI keeps the IndexedDB warning visible.
       for (const k of LS_KEPT_LEGACY) {
         const raw = localStorage.getItem(k);
-        if (raw) raw.split('\n').filter(Boolean).forEach((key) => nextKept.add(key));
+        if (raw) raw.split('\n').filter(Boolean).forEach((line) => { const parts = line.split('\t'); acceptKept(parts[0], parts[1]); });
       }
       const m = JSON.parse(localStorage.getItem(LS_STATE + '.marked') || '[]');
       if (!Array.isArray(m)) throw new Error('invalid local marked snapshot');
       m.forEach(acceptMarked);
     } else {
-      const keys = await this.tx('kept', 'readonly', (st) => st.getAllKeys());
-      (keys || []).forEach((k) => {
-        if (!validRpcKey(k)) throw new Error('invalid local kept row');
-        nextKept.add(k);
+      // keys and values of the same store in one transaction; both come back
+      // in key order, so they line up
+      let keys = null, values = null;
+      await this._tx('kept', 'readonly', (tx) => {
+        const st = tx.objectStore('kept');
+        const rk = st.getAllKeys(); rk.onsuccess = () => { keys = rk.result; };
+        const rv = st.getAll(); rv.onsuccess = () => { values = rv.result; };
+        return rv;
       });
+      if (!Array.isArray(keys) || !Array.isArray(values) || keys.length !== values.length) throw new Error('invalid local kept snapshot');
+      keys.forEach((k, i) => acceptKept(k, values[i]));
       const rows = await this.tx('marked', 'readonly', (st) => st.getAll());
       (rows || []).forEach(acceptMarked);
     }
@@ -1898,8 +2348,8 @@ const store = {
     // Swap only after every read succeeded. A partial snapshot must never be
     // exposed to the feed, because it could offer a pending-delete item again.
     this._assertUsable();
-    kept.clear();
-    nextKept.forEach((k) => kept.add(k));
+    keptClearAll();
+    nextKept.forEach(([k, d]) => keptAdd(k, d));
     marked.clear();
     nextMarked.forEach((it, k) => marked.set(k, it));
   },
@@ -2026,40 +2476,37 @@ const store = {
   },
   _warn(e) { console.warn('[gpSwipe] IndexedDB write failed', e); },
 
-  keepAdd(key) {
-    this._assertUsable();
-    kept.add(key);
-    if (this.db) return this.tx('kept', 'readwrite', (st) => st.put(1, key)).catch(this._warn);
-    return this._fallbackKept();
+  // a kept row: key = mediaKey, value = dedupKey (or 1 when it is unknown)
+  _keepPut(st, item) { st.put(dedupOf(item) || 1, item.mediaKey); },
+  _keepDelete(st, item) { st.delete(item.mediaKey); },
+  _keptAdd(item) { keptAdd(item.mediaKey, dedupOf(item)); },
+  _keptDel(item) { keptRemove(item.mediaKey); },
+  _snapshot() {
+    return { kept: Array.from(kept).map((k) => [k, keptDedupOf.get(k) || null]), marked: new Map(marked) };
   },
-  keepDel(key) {
-    this._assertUsable();
-    kept.delete(key);
-    if (this.db) return this.tx('kept', 'readwrite', (st) => st.delete(key)).catch(this._warn);
-    return this._fallbackKept();
+  _restore(snap) {
+    keptClearAll();
+    snap.kept.forEach(([k, d]) => keptAdd(k, d));
+    marked.clear(); snap.marked.forEach((it, k) => marked.set(k, it));
   },
-  keepAddMany(keys) {
-    this._assertUsable();
-    keys.forEach((k) => kept.add(k));
-    if (this.db) return this.tx('kept', 'readwrite', (st) => keys.forEach((k) => st.put(1, k))).catch(this._warn);
-    return this._fallbackKept();
-  },
+
   async keepClear() {
     this._assertUsable();
     if (this.db) {
       await this.tx('kept', 'readwrite', (st) => st.clear());
-      kept.clear();
+      keptClearAll();
       return;
     }
-    const before = new Set(kept);
-    kept.clear();
+    const snap = this._snapshot();
+    keptClearAll();
     if (this._fallbackKept()) return;
-    before.forEach((key) => kept.add(key));
+    this._restore(snap);
     this._fallbackKept();
     throw new Error('localStorage kept reset failed');
   },
   _fallbackKept() {
-    try { localStorage.setItem(LS_KEPT_LEGACY[1], Array.from(kept).join('\n')); return true; }
+    const rows = Array.from(kept).map((k) => (keptDedupOf.has(k) ? k + '\t' + keptDedupOf.get(k) : k));
+    try { localStorage.setItem(LS_KEPT_LEGACY[1], rows.join('\n')); return true; }
     catch (e) { console.warn('[gpSwipe] could not persist the kept list', e); return false; }
   },
 
@@ -2095,52 +2542,60 @@ const store = {
     this._assertUsable();
     const key = item && item.mediaKey;
     if (!key || (action !== 'keep' && action !== 'mark')) throw new Error('invalid disposition');
+    // The same photo may already be pending under another key (an album row of
+    // a photo marked from the library, or the reverse). One decision per photo:
+    // that older row goes with this one.
+    const twinKey = item.dedupKey && marked.byDedup.get(item.dedupKey);
+    const twin = twinKey && twinKey !== key ? twinKey : null;
+    const apply = () => {
+      if (action === 'keep') { this._keptAdd(item); marked.delete(key); }
+      else { this._keptDel(item); marked.set(key, item); }
+      if (twin) marked.delete(twin);
+    };
     if (this.db) {
       await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
         const keepStore = tx.objectStore('kept');
         const markStore = tx.objectStore('marked');
-        if (action === 'keep') { keepStore.put(1, key); markStore.delete(key); }
-        else { keepStore.delete(key); markStore.put(item, key); }
+        if (action === 'keep') { this._keepPut(keepStore, item); markStore.delete(key); }
+        else { this._keepDelete(keepStore, item); markStore.put(item, key); }
+        if (twin) markStore.delete(twin);
       });
-      if (action === 'keep') { kept.add(key); marked.delete(key); }
-      else { kept.delete(key); marked.set(key, item); }
+      apply();
       return;
     }
-    const wasKept = kept.has(key);
-    const wasMarked = marked.get(key);
-    if (action === 'keep') { kept.add(key); marked.delete(key); }
-    else { kept.delete(key); marked.set(key, item); }
+    const snap = this._snapshot();
+    apply();
     const keptOk = this._fallbackKept();
     const markedOk = this._fallbackMarked();
     if (keptOk && markedOk) return;
-    if (wasKept) kept.add(key); else kept.delete(key);
-    if (wasMarked) marked.set(key, wasMarked); else marked.delete(key);
+    this._restore(snap);
     this._fallbackKept();
     this._fallbackMarked();
     throw new Error('localStorage decision transaction failed');
   },
 
-  async clearDisposition(key) {
+  // Undo: forget the decision on this photo. Takes the item so the dedup row
+  // can go too; a bare mediaKey is accepted for rows whose item is unknown.
+  async clearDisposition(itemOrKey) {
     this._assertUsable();
+    const key = typeof itemOrKey === 'string' ? itemOrKey : itemOrKey && itemOrKey.mediaKey;
     if (!key) throw new Error('invalid disposition key');
+    const known = typeof itemOrKey === 'object' && itemOrKey ? itemOrKey : (marked.get(key) || { mediaKey: key });
+    const apply = () => { this._keptDel(known); marked.delete(key); };
     if (this.db) {
       await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
-        tx.objectStore('kept').delete(key);
+        this._keepDelete(tx.objectStore('kept'), known);
         tx.objectStore('marked').delete(key);
       });
-      kept.delete(key);
-      marked.delete(key);
+      apply();
       return;
     }
-    const wasKept = kept.has(key);
-    const wasMarked = marked.get(key);
-    kept.delete(key);
-    marked.delete(key);
+    const snap = this._snapshot();
+    apply();
     const keptOk = this._fallbackKept();
     const markedOk = this._fallbackMarked();
     if (keptOk && markedOk) return;
-    if (wasKept) kept.add(key);
-    if (wasMarked) marked.set(key, wasMarked);
+    this._restore(snap);
     this._fallbackKept();
     this._fallbackMarked();
     throw new Error('localStorage undo transaction failed');
@@ -2184,22 +2639,20 @@ const store = {
   async moveMarkedToKept(items) {
     this._assertUsable();
     if (!items.length) return;
-    const keys = items.map((it) => it.mediaKey);
+    const apply = () => items.forEach((it) => { this._keptAdd(it); marked.delete(it.mediaKey); });
     if (this.db) {
       await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
         const keepStore = tx.objectStore('kept');
         const markStore = tx.objectStore('marked');
-        keys.forEach((k) => { keepStore.put(1, k); markStore.delete(k); });
+        items.forEach((it) => { this._keepPut(keepStore, it); markStore.delete(it.mediaKey); });
       });
-      keys.forEach((k) => { kept.add(k); marked.delete(k); });
+      apply();
       return;
     }
-    const oldMarked = new Map(items.map((it) => [it.mediaKey, marked.get(it.mediaKey)]));
-    const oldKept = new Set(keys.filter((k) => kept.has(k)));
-    keys.forEach((k) => { kept.add(k); marked.delete(k); });
+    const snap = this._snapshot();
+    apply();
     if (!this._fallbackKept() || !this._fallbackMarked()) {
-      keys.forEach((k) => { if (!oldKept.has(k)) kept.delete(k); });
-      oldMarked.forEach((it, key) => { if (it) marked.set(key, it); });
+      this._restore(snap);
       this._fallbackKept();
       this._fallbackMarked();
       throw new Error('localStorage review transaction failed');
@@ -2290,19 +2743,62 @@ window.addEventListener('beforeunload', () => persist(true));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persist(true); });
 
 // ---------------------------------------------------------------------------
-// The feed: pages the library newest-first and hands out items that still need
-// a decision. Items already kept or already marked for deletion are filtered
-// out, so a photo is never offered twice.
+// The feed: hands out items that still need a decision, in the order the user
+// chose in the scan menu. Items already kept or already marked for deletion are
+// filtered out (by either of a photo's two identifiers), so a photo is never
+// offered twice.
+//
+// Google's listing (`lcxiM`) only pages newest-first below an inclusive
+// timestamp; there is no ascending mode and no lower bound. Every other order
+// is built on top of that here:
+//   newest  — page down from the top (or from the resume cursor)
+//   oldest  — consume the timeline in intervals (lo, hi]; see loadOldest()
+//   random  — draw timestamps, take a handful of the rows just below each one,
+//             and interleave the draws so consecutive cards differ
+//   album   — `snAcKc` pages, buffered whole, then sorted or shuffled locally
 // ---------------------------------------------------------------------------
 
 const QUEUE_TARGET = 12;   // keep this many decided-free items buffered
 const PAGE_SIZE = 200;
 const MAX_SCAN_PAGES = 40; // one bounded scan; continuing requires a user retry
 const MAX_SCAN_MS = 20000;
+const RANDOM_TAKE = 12;    // rows kept from one random draw
+const RANDOM_PRIME = 4;    // draws issued together when the deck is empty
+const RANDOM_REFILL = 2;   // draws issued together to top the deck up
+const RANDOM_DRY_DRAWS = 6; // fruitless draws in a row before the sequential sweep
+const ALBUM_SANITY_PAGES = 2000; // an album cannot have more pages than this
+const EPOCH_FLOOR = Date.UTC(1900, 0, 1);
+const FUTURE_SLACK = 366 * 86400000;
+const CHUNK_MIN_SPAN = 3600000;   // an interval one hour wide is taken whole, however dense
+const CHUNK_MAX_PAGES = 1;        // a wider interval that does not fit one page is halved
+const CHUNK_GROWTH_MAX = 4;       // how much wider the next interval guess may get at once
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
+}
+
+// Round-robin merge: one from each list in turn, so neighbouring cards come
+// from different draws.
+function interleave(lists) {
+  const out = [];
+  const src = lists.filter((l) => l && l.length);
+  let i = 0;
+  while (src.length) {
+    const l = src[i % src.length];
+    out.push(l.shift());
+    if (!l.length) { src.splice(i % src.length, 1); if (!src.length) break; }
+    else i++;
+  }
+  return out;
+}
 
 const feed = {
   queue: [],
-  nextPageId: undefined,   // undefined = not started, null = no more pages
+  nextPageId: undefined,   // sequential loader: undefined = not started, null = no more pages
   loading: false,
   exhausted: false,
   error: false,
@@ -2311,13 +2807,54 @@ const feed = {
   info: {},                // mediaKey -> { fileName, size }
   infoFailed: false,
   infoAsked: new Set(),
-  seen: new Set(),         // handed out during this session
+  seen: new Set(),         // handed out during this session, by mediaKey and 'd:' + dedupKey
   requestedPages: new Set(),
-  restartTs: null,         // one-shot safe boundary after a library mutation
+  restartTs: null,         // one-shot safe upper bound after a library mutation (newest order)
   lastPageTs: null,
+  plan: null,              // what the scan covers, frozen at reset()
+  progress: null,          // { kind: 'album', i, n } | { kind: 'oldest' } while loading
+  myActor: null,           // the user's actor id, learned from the chosen album
+  // oldest-first interval search
+  chunkLo: null,           // every row with ts <= chunkLo is done
+  chunkTop: null,          // current upper probe
+  chunkPartial: null,      // rows + token of a dense interval still being paged
+  nextSpan: null,          // width guess for the next interval, from the previous one's density
+  rangeHi: null,
+  // random
+  randomLo: null, randomHi: null, dryDraws: 0, sweeping: false, randomStarted: false,
+  // album
+  album: null,             // { items, pos, loaded, pages, nextPageId, count, ownerActor, offered }
+  albumEmpty: false,       // the chosen album has nothing this scan can show
 
+  makePlan() {
+    const s = state.settings;
+    const day = (v, tail) => {
+      if (!v) return null;
+      const d = new Date(v + tail);
+      return isNaN(d.getTime()) ? null : d.getTime();
+    };
+    return {
+      order: s.order,
+      scope: s.albumKey ? 'album' : 'library',
+      source: s.source,
+      albumKey: s.albumKey,
+      albumAuthKey: s.albumAuthKey,
+      albumOwner: s.albumOwner,
+      albumTitle: s.albumTitle,
+      fromTs: day(s.dateFrom, 'T00:00:00'),
+      toTs: day(s.dateTo, 'T23:59:59.999'),
+      mediaType: s.mediaType,
+      skipFav: !!s.skipFav && !s.albumKey,   // album rows carry no favourite flag
+      resume: !!s.resume,
+    };
+  },
+
+  // A fresh scan. `o.boundary` = { newest, oldest } when the plain newest-first
+  // listing restarts after a trash/restore (see afterMutation()).
   reset(o) {
     this.gen++;
+    const boundary = (o && o.boundary) || {};
+    this.plan = this.makePlan();
     this.queue = [];
     this.nextPageId = undefined;
     this.loading = false;
@@ -2325,34 +2862,110 @@ const feed = {
     this.error = false;
     this.seen = new Set();
     this.requestedPages = new Set();
-    this.restartTs = o && typeof o.timestamp === 'number' ? o.timestamp : null;
     this.lastPageTs = null;
     this.infoFailed = false;
     this.infoAsked = new Set();
+    this.progress = null;
+    // Only the plain newest-first listing may restart below a boundary: random
+    // order leaves undecided photos above it, and the other loaders restart by
+    // their own means.
+    const sequential = this.plan.scope === 'library' && this.plan.order === 'newest';
+    this.restartTs = sequential && typeof boundary.newest === 'number' ? boundary.newest : null;
+    this.rangeHi = this.plan.toTs != null ? this.plan.toTs : Date.now() + FUTURE_SLACK;
+    this.chunkLo = null;
+    this.chunkTop = null;
+    this.chunkPartial = null;
+    this.nextSpan = null;
+    this.randomLo = null; this.randomHi = null; this.dryDraws = 0; this.sweeping = false; this.randomStarted = false;
+    this.album = null;
+    this.albumEmpty = false;
+    this.myActor = null;
   },
 
+  // A trash or restore changed the library underneath us. Offset page tokens
+  // may now point elsewhere, so a listing that holds one restarts below the
+  // newest still-undecided photo. Timestamp-defined intervals (oldest order),
+  // random draws and album snapshots hold no such token: they keep their
+  // position and merely drop the photos that were just decided. `live` are the
+  // cards that were on screen; undecided ones return to the front of the deck.
+  afterMutation(boundary, live) {
+    const p = this.plan;
+    const holdsToken = p.scope === 'library' && (p.order === 'newest' || (p.order === 'random' && this.sweeping));
+    if (holdsToken) {
+      const sweeping = this.sweeping;
+      this.reset({ boundary: boundary });
+      if (sweeping) {
+        // continue the leftover sweep from the boundary rather than drawing again
+        this.sweeping = true;
+        this.randomStarted = true;
+        this.restartTs = typeof boundary.newest === 'number' ? boundary.newest : null;
+      }
+      return;
+    }
+    this.gen++;                 // whatever is in flight is re-probed by timestamp
+    this.loading = false;
+    this.progress = null;
+    this.chunkPartial = null;   // a dense interval restarts from its first page
+    if (this.album && !this.album.loaded) this.album = null;   // half-read snapshot: its tokens may have shifted too
+    if (this.error === true) this.error = false;
+    const undecided = (it) => it && !isKept(it) && !isMarked(it);
+    const front = (live || []).filter(undecided);
+    const frontKeys = new Set(front.map((it) => it.mediaKey));
+    this.queue = front.concat(this.queue.filter((it) => undecided(it) && !frontKeys.has(it.mediaKey)));
+    front.forEach((it) => this.markSeen(it));
+  },
+
+  // Sequential (newest-first) upper bound for the first request.
   startTimestamp() {
     if (typeof this.restartTs === 'number') return this.restartTs;
-    const s = state.settings;
-    let dateTs = null;
-    if (s.startDate) {
-      const d = new Date(s.startDate + 'T23:59:59');
-      if (!isNaN(d.getTime())) dateTs = d.getTime();
-    }
-    const resumeTs = s.resume && state.cursorTs ? state.cursorTs : null;
+    const p = this.plan;
+    const resumeTs = p.resume && p.order === 'newest' && typeof state.cursorTs === 'number' ? state.cursorTs : null;
     // both are upper bounds; the older one is the only safe place to start
-    if (dateTs != null && resumeTs != null) return Math.min(dateTs, resumeTs);
-    return dateTs != null ? dateTs : resumeTs;
+    if (p.toTs != null && resumeTs != null) return Math.min(p.toTs, resumeTs);
+    return p.toTs != null ? p.toTs : resumeTs;
+  },
+
+  markSeen(it) {
+    this.seen.add(it.mediaKey);
+    if (typeof it.dedupKey === 'string' && it.dedupKey) this.seen.add(DEDUP_PREFIX + it.dedupKey);
+  },
+  wasSeen(it) {
+    return this.seen.has(it.mediaKey) || (typeof it.dedupKey === 'string' && this.seen.has(DEDUP_PREFIX + it.dedupKey));
   },
 
   accept(it) {
     if (!it || !it.mediaKey || !it.dedupKey || !it.thumb) return false;
-    if (kept.has(it.mediaKey)) return false;
-    if (marked.has(it.mediaKey)) return false;
-    if (this.seen.has(it.mediaKey)) return false;
-    if (state.settings.skipVideos && it.isVideo) return false;
-    if (state.settings.skipFav && it.isFavorite) return false;
+    if (isKept(it) || isMarked(it) || this.wasSeen(it)) return false;
+    const p = this.plan;
+    if (p.mediaType === 'photo' && it.isVideo) return false;
+    if (p.mediaType === 'video' && !it.isVideo) return false;
+    if (p.skipFav && it.isFavorite) return false;
+    if (typeof it.ts === 'number') {
+      if (p.fromTs != null && it.ts < p.fromTs) return false;
+      if (p.toTs != null && it.ts > p.toTs) return false;
+    }
+    // In a shared album, rows added by other people are not in this library
+    // and cannot be trashed from here.
+    if (p.scope === 'album' && this.myActor && it.ownerActor && it.ownerActor !== this.myActor) return false;
     return true;
+  },
+
+  push(items) {
+    for (const it of items) {
+      if (this.accept(it)) { this.queue.push(it); this.markSeen(it); }
+    }
+  },
+
+  // One bounded scan per ensure(): so many pages or so much time, then pause
+  // in a recoverable state that an explicit Retry continues.
+  budget() {
+    const started = performance.now();
+    let pages = 0;
+    return {
+      page() { pages++; },
+      get pages() { return pages; },
+      spent() { return pages >= MAX_SCAN_PAGES || performance.now() - started >= MAX_SCAN_MS; },
+    };
   },
 
   async ensure() {
@@ -2362,69 +2975,318 @@ const feed = {
     const gen = this.gen;
     app.renderState();
     try {
-      let scannedPages = 0;
-      const scanStarted = performance.now();
-      while (this.queue.length < QUEUE_TARGET && !this.exhausted
-        && scannedPages < MAX_SCAN_PAGES && performance.now() - scanStarted < MAX_SCAN_MS) {
-        scannedPages++;
-        const requestKey = this.nextPageId === undefined ? '__first__' : String(this.nextPageId);
-        if (this.requestedPages.has(requestKey)) throw new Error('pagination token repeated: ' + requestKey);
-        this.requestedPages.add(requestKey);
-        let page;
-        try {
-          page = await api.listLibrary({
-            pageId: this.nextPageId === undefined ? null : this.nextPageId,
-            timestamp: this.nextPageId === undefined ? this.startTimestamp() : null,
-            pageSize: PAGE_SIZE,
-            source: state.settings.source,
-          });
-        } catch (e) {
-          // A token is consumed only by a successful response. Keep transient
-          // failures retryable while still detecting genuine repeated tokens.
-          this.requestedPages.delete(requestKey);
-          throw e;
-        }
-        if (gen !== this.gen) return;  // a reset happened while we were waiting
-        const structurallyUsable = page.items.filter(validMarkedItem);
-        // A live library page routinely carries rows this client does not
-        // model (padding rows, uploads with no thumbnail yet). Skipping those
-        // individually is normal. Only a page that returns rows yet yields
-        // nothing usable at all indicates the response shape changed; without
-        // that guard a malformed source can be paged forever behind Loading.
-        if (page.rawItemCount > 0 && structurallyUsable.length === 0) {
-          // The page was not consumed: a later Retry must be allowed to fetch
-          // the same token after a page reload or compatibility fix.
-          this.requestedPages.delete(requestKey);
-          throw new Error('library response contains no usable media rows');
-        }
-        // Only fully-formed rows may enter the queue: a queued item can be
-        // marked, persisted and later named in a trash request.
-        for (const it of structurallyUsable) {
-          if (this.accept(it)) { this.queue.push(it); this.seen.add(it.mediaKey); }
-        }
-        if (typeof page.lastItemTimestamp === 'number') this.lastPageTs = page.lastItemTimestamp;
-        else if (page.items.length && typeof page.items[page.items.length - 1].ts === 'number') this.lastPageTs = page.items[page.items.length - 1].ts;
-        this.nextPageId = page.nextPageId;
-        // Google can return an empty intermediate page with a continuation
-        // token.  Only the absence of that token proves the source is done.
-        if (!page.nextPageId) this.exhausted = true;
-      }
-      // `finally -> onFeedChanged -> swipe.render -> feed.take()` used to call
-      // ensure() again immediately here, defeating the 40-page guard. Pause in
-      // a recoverable state instead; Retry continues from the retained token.
-      if (!this.exhausted && (scannedPages >= MAX_SCAN_PAGES || performance.now() - scanStarted >= MAX_SCAN_MS)) {
-        this.error = 'scan-paused';
-      }
+      const p = this.plan;
+      if (p.scope === 'album') await this.loadAlbum(gen);
+      else if (p.order === 'oldest') await this.loadOldest(gen);
+      else if (p.order === 'random') await this.loadRandom(gen);
+      else await this.loadNewest(gen);
+      if (gen !== this.gen) return;  // a reset happened while we were waiting
       this.loadInfo();
     } catch (e) {
       if (gen !== this.gen) return;
       console.error('[gpSwipe] could not load the library', e);
-      this.error = true;
+      this.error = e && e.albumGone ? 'album-gone' : true;
     } finally {
       if (gen === this.gen) {
         this.loading = false;
+        this.progress = null;
         app.onFeedChanged();
       }
+    }
+  },
+
+  // Fetch one library page and keep only rows that are fully formed: a queued
+  // item can be marked, persisted and later named in a trash request.
+  async fetchPage(o) {
+    const page = await api.listLibrary({
+      pageId: o.pageId || null,
+      timestamp: o.pageId ? null : (o.timestamp != null ? o.timestamp : null),
+      pageSize: o.pageSize || PAGE_SIZE,
+      source: this.plan.source,
+    });
+    const usable = page.items.filter(validMarkedItem);
+    // A live library page routinely carries rows this client does not model
+    // (padding rows, uploads with no thumbnail yet). Skipping those
+    // individually is normal. Only a page that returns rows yet yields nothing
+    // usable at all indicates the response shape changed; without that guard a
+    // malformed source can be paged forever behind Loading.
+    if (page.rawItemCount > 0 && usable.length === 0) throw new Error('library response contains no usable media rows');
+    let oldestTs = null;
+    for (const it of usable) if (typeof it.ts === 'number' && (oldestTs === null || it.ts < oldestTs)) oldestTs = it.ts;
+    if (oldestTs === null && typeof page.lastItemTimestamp === 'number') oldestTs = page.lastItemTimestamp;
+    return { items: usable, nextPageId: page.nextPageId, oldestTs: oldestTs, rawItemCount: page.rawItemCount };
+  },
+
+  // ---- newest first (the plain listing) ----------------------------------
+  async loadNewest(gen) {
+    const budget = this.budget();
+    while (this.queue.length < QUEUE_TARGET && !this.exhausted && !budget.spent()) {
+      const requestKey = this.nextPageId === undefined ? '__first__' : String(this.nextPageId);
+      if (this.requestedPages.has(requestKey)) throw new Error('pagination token repeated: ' + requestKey);
+      this.requestedPages.add(requestKey);
+      let page;
+      try {
+        page = await this.fetchPage({
+          pageId: this.nextPageId === undefined ? null : this.nextPageId,
+          timestamp: this.nextPageId === undefined ? this.startTimestamp() : null,
+        });
+      } catch (e) {
+        // A token is consumed only by a successful response. Keep transient
+        // failures retryable while still detecting genuine repeated tokens.
+        this.requestedPages.delete(requestKey);
+        throw e;
+      }
+      budget.page();
+      if (gen !== this.gen) return;
+      this.push(page.items);
+      if (typeof page.oldestTs === 'number') this.lastPageTs = page.oldestTs;
+      this.nextPageId = page.nextPageId;
+      // Google can return an empty intermediate page with a continuation
+      // token.  Only the absence of that token proves the source is done —
+      // unless the page already reached below the requested date range.
+      if (!page.nextPageId) this.exhausted = true;
+      else if (this.plan.fromTs != null && typeof page.oldestTs === 'number' && page.oldestTs < this.plan.fromTs) this.exhausted = true;
+    }
+    // `finally -> onFeedChanged -> swipe.render -> feed.take()` used to call
+    // ensure() again immediately here, defeating the 40-page guard. Pause in
+    // a recoverable state instead; Retry continues from the retained token.
+    if (!this.exhausted && this.queue.length < QUEUE_TARGET && budget.spent()) this.error = 'scan-paused';
+  },
+
+  // ---- oldest first --------------------------------------------------------
+  // The timeline is consumed in intervals (lo, hi] by TIMESTAMP: probe the
+  // newest rows at or below hi and follow the continuation until a row at or
+  // below lo appears (or the tokens run out). Then every row in the interval
+  // is in hand and can be served oldest first; the next interval starts at hi.
+  // An interval that does not fit in one page is halved, an empty one is
+  // skipped and the next guess widened, so the first interval costs about
+  // log2(range / page span) round trips and later ones usually one or two.
+  // A page budget only ever pauses this; an interval closes solely on proof.
+  async loadOldest(gen) {
+    const p = this.plan;
+    if (this.chunkLo === null) {
+      let lo = p.fromTs != null ? p.fromTs - 1 : EPOCH_FLOOR;
+      if (p.resume && typeof state.cursorFloorTs === 'number') lo = Math.max(lo, state.cursorFloorTs - 1);
+      this.chunkLo = lo;
+    }
+    const budget = this.budget();
+    while (this.queue.length < QUEUE_TARGET && !this.exhausted && !budget.spent()) {
+      if (this.chunkLo >= this.rangeHi) { this.exhausted = true; break; }
+      if (this.chunkTop === null) this.chunkTop = this.guessTop();
+      this.progress = { kind: 'oldest' };
+      const res = await this.probeInterval(this.chunkLo, this.chunkTop, budget, gen);
+      if (gen !== this.gen) return;
+      if (res === null) break;                       // budget spent mid-interval; state retained
+      const lo = this.chunkLo, top = this.chunkTop;
+      if (!res.crossed) {
+        // more rows in (lo, top] than one page holds: halve the interval
+        this.chunkTop = lo + Math.floor((top - lo) / 2);
+        this.chunkPartial = null;
+        continue;
+      }
+      const rows = res.rows.filter((it) => typeof it.ts === 'number' && it.ts > lo);
+      if (!res.rows.length) this.rememberFloor(top);
+      const span = top - lo;
+      if (rows.length) {
+        rows.sort((a, b) => a.ts - b.ts);
+        this.push(rows);
+        // aim the next interval at about a page of rows
+        this.nextSpan = Math.min(span * CHUNK_GROWTH_MAX, Math.max(CHUNK_MIN_SPAN, Math.floor(span * (PAGE_SIZE * 0.8) / rows.length)));
+      } else {
+        // nothing in (lo, top]: skip it and look twice as far next time
+        this.nextSpan = Math.max(CHUNK_MIN_SPAN, span * 2);
+      }
+      this.chunkLo = top;
+      this.chunkTop = null;
+      this.chunkPartial = null;
+      if (top >= this.rangeHi) this.exhausted = true;
+    }
+    if (!this.exhausted && this.queue.length < QUEUE_TARGET && budget.spent()) this.error = 'scan-paused';
+  },
+
+  // Upper probe for the next interval: extrapolate from the previous one so
+  // that roughly a page of rows lands inside, or use the whole range first.
+  guessTop() {
+    const lo = this.chunkLo;
+    if (typeof this.nextSpan === 'number') return Math.min(this.rangeHi, lo + this.nextSpan);
+    // A remembered floor is a hint, never a bound: it is probed like any other
+    // interval, so photos that arrived later with an older date still show up.
+    if (typeof state.floorTs === 'number' && state.floorTs > lo && state.floorTs < this.rangeHi) return state.floorTs;
+    return this.rangeHi;
+  },
+
+  rememberFloor(ts) {
+    if (this.plan.source !== 1 || this.plan.fromTs != null) return;
+    if (typeof state.floorTs !== 'number' || ts > state.floorTs) { state.floorTs = ts; persist(); }
+  },
+
+  // Rows at or below `top`, newest first, following the continuation until the
+  // interval down to `lo` is covered. A dense interval (many pages inside a
+  // single hour) cannot be narrowed any further, so it is paged through with
+  // no page cap of its own; the scan budget pauses it and retains its partial
+  // state, so Retry continues instead of starting over. Returns null when the
+  // budget ran out first.
+  async probeInterval(lo, top, budget, gen) {
+    const maxPages = top - lo <= CHUNK_MIN_SPAN ? Infinity : CHUNK_MAX_PAGES;
+    let part = this.chunkPartial;
+    if (!part || part.lo !== lo || part.top !== top) part = { lo: lo, top: top, rows: [], pageId: null, pages: 0, tokens: new Set() };
+    this.chunkPartial = part;
+    while (part.pages < maxPages) {
+      if (budget.spent()) return null;
+      const key = part.pageId === null ? '__first__' : String(part.pageId);
+      if (part.tokens.has(key)) throw new Error('pagination token repeated: ' + key);
+      const page = await this.fetchPage({ pageId: part.pageId, timestamp: part.pageId === null ? top : null });
+      budget.page();
+      if (gen !== this.gen) return null;
+      part.tokens.add(key);
+      part.pages++;
+      part.rows.push.apply(part.rows, page.items);
+      if (!page.nextPageId) return { rows: part.rows, crossed: true };        // nothing older exists at all
+      if (typeof page.oldestTs === 'number' && page.oldestTs <= lo) return { rows: part.rows, crossed: true };
+      part.pageId = page.nextPageId;
+    }
+    return { rows: part.rows, crossed: false };
+  },
+
+  // ---- random --------------------------------------------------------------
+  // Each draw picks a timestamp uniformly between the oldest and newest photo
+  // and keeps a dozen of the rows just below it; several draws are issued
+  // together and interleaved, so consecutive cards come from different
+  // periods rather than one afternoon. The draw is uniform in time, not in
+  // photos, so busy periods are under-represented; the menu says so. Once
+  // several draws in a row find nothing new, the remaining photos are swept
+  // newest-first so the mode can still finish honestly.
+  async loadRandom(gen) {
+    if (this.sweeping) { await this.loadNewest(gen); return; }
+    const p = this.plan;
+    const budget = this.budget();
+    if (this.randomLo === null) this.randomLo = p.fromTs != null ? p.fromTs : EPOCH_FLOOR;
+    if (this.randomHi === null) this.randomHi = this.rangeHi;
+    if (!this.randomStarted) {
+      // first look at the newest rows: does the whole range fit one page?
+      const page = await this.fetchPage({ pageId: null, timestamp: this.randomHi });
+      budget.page();
+      if (gen !== this.gen) return;
+      this.randomStarted = true;
+      if (!page.nextPageId) {
+        this.push(shuffle(page.items.slice()));
+        this.exhausted = true;
+        return;
+      }
+      let newest = null;
+      for (const it of page.items) if (typeof it.ts === 'number' && (newest === null || it.ts > newest)) newest = it.ts;
+      if (newest !== null && newest < this.randomHi) this.randomHi = newest;
+      const first = this.bucket(page.items);
+      if (first.length) this.queue = interleave([this.queue, first]);
+    }
+    while (this.queue.length < QUEUE_TARGET && !this.exhausted && !this.sweeping && !budget.spent()) {
+      const n = this.queue.length ? RANDOM_REFILL : RANDOM_PRIME;
+      const draws = [];
+      for (let i = 0; i < n; i++) draws.push(this.randomLo + Math.floor(Math.random() * Math.max(1, this.randomHi - this.randomLo + 1)));
+      const pages = await Promise.all(draws.map((T) => this.fetchPage({ pageId: null, timestamp: T }).then((page) => ({ T: T, page: page }))));
+      for (let i = 0; i < pages.length; i++) budget.page();
+      if (gen !== this.gen) return;
+      const buckets = [];
+      let floorRaised = false;
+      for (const d of pages) {
+        if (!d.page.nextPageId && !d.page.items.length) {   // nothing at or below T: the library starts later
+          this.rememberFloor(d.T);
+          if (d.T + 1 > this.randomLo) this.randomLo = Math.min(this.randomHi, d.T + 1);
+          floorRaised = true;
+          continue;
+        }
+        const b = this.bucket(d.page.items);
+        if (b.length) buckets.push(b);
+      }
+      if (!buckets.length) {
+        if (floorRaised) continue;                 // learning where the library starts is not a dry draw
+        this.dryDraws += pages.length;
+        if (this.dryDraws >= RANDOM_DRY_DRAWS) {
+          this.sweeping = true;
+          this.nextPageId = undefined;
+          this.restartTs = null;
+          app.renderState();                        // the chip now says the leftovers are being swept
+          await this.loadNewest(gen);
+          return;
+        }
+        continue;
+      }
+      this.dryDraws = 0;
+      this.queue = interleave([this.queue].concat(buckets));
+    }
+    if (!this.exhausted && !this.sweeping && this.queue.length < QUEUE_TARGET && budget.spent()) this.error = 'scan-paused';
+  },
+
+  // Up to RANDOM_TAKE acceptable rows of one draw, in random order, stamped
+  // as seen so a neighbouring draw cannot hand them out again.
+  bucket(items) {
+    const out = [];
+    for (const it of shuffle(items.slice())) {
+      if (out.length >= RANDOM_TAKE) break;
+      if (this.accept(it)) { out.push(it); this.markSeen(it); }
+    }
+    return out;
+  },
+
+  // ---- one album -----------------------------------------------------------
+  // Albums are bounded, so the whole album is read once and kept as a
+  // snapshot: ordering and shuffling happen locally, and a trash or restore
+  // only needs the decided rows dropped. The scan budget can pause the read;
+  // Retry continues from the retained token, and the album counts as complete
+  // only once Google stops handing out tokens.
+  async loadAlbum(gen) {
+    const p = this.plan;
+    if (!this.album) this.album = { items: [], pos: 0, loaded: false, sorted: false, pages: 0, nextPageId: null, count: null, ownerActor: null, offered: 0, tokens: new Set() };
+    const a = this.album;
+    const budget = this.budget();
+    while (!a.loaded) {
+      if (budget.spent()) { this.error = 'scan-paused'; return; }
+      if (a.pages >= ALBUM_SANITY_PAGES) throw new Error('album pagination never ended');
+      const key = a.nextPageId === null ? '__first__' : String(a.nextPageId);
+      if (a.tokens.has(key)) throw new Error('pagination token repeated: ' + key);
+      this.progress = { kind: 'album', i: a.items.length, n: a.count };
+      app.renderState();
+      let page;
+      try {
+        page = await api.listAlbumPage(p.albumKey, { pageId: a.nextPageId, authKey: p.albumAuthKey });
+      } catch (e) {
+        // A rejected key (album deleted, unshared, or a stale auth key) cannot
+        // be fixed by retrying; go back to the library instead of looping.
+        if (e && /^rpc error/.test(String(e.message))) e.albumGone = true;
+        throw e;
+      }
+      budget.page();
+      if (gen !== this.gen) return;
+      a.tokens.add(key);
+      a.pages++;
+      const usable = page.items.filter(validMarkedItem);
+      if (page.rawItemCount > 0 && usable.length === 0) throw new Error('album response contains no usable media rows');
+      // An album row's key only resolves inside its album; carry the album
+      // along so links and later sessions can still open the photo.
+      usable.forEach((it) => { it.albumKey = p.albumKey; });
+      a.items.push.apply(a.items, usable);
+      if (typeof page.itemCount === 'number') a.count = page.itemCount;
+      if (page.ownerActor && !a.ownerActor) a.ownerActor = page.ownerActor;
+      if (!page.nextPageId) a.loaded = true;
+      else a.nextPageId = page.nextPageId;
+    }
+    // The picker only offers albums the user made, so the album owner is the
+    // user; rows uploaded by anyone else are dropped in accept().
+    if (!this.myActor) this.myActor = p.albumOwner || a.ownerActor || null;
+    if (!a.sorted) {
+      if (p.order === 'oldest') a.items.sort((x, y) => (x.ts || 0) - (y.ts || 0));
+      else if (p.order === 'random') shuffle(a.items);
+      else a.items.sort((x, y) => (y.ts || 0) - (x.ts || 0));
+      a.sorted = true;
+    }
+    this.progress = null;
+    while (a.pos < a.items.length && this.queue.length < QUEUE_TARGET) {
+      const it = a.items[a.pos++];
+      if (this.accept(it)) { this.queue.push(it); this.markSeen(it); a.offered++; }
+    }
+    if (a.pos >= a.items.length) {
+      this.exhausted = true;
+      this.albumEmpty = a.offered === 0 && this.queue.length === 0;
     }
   },
 
@@ -2456,39 +3318,60 @@ const feed = {
   putBack(it) {
     this.queue = this.queue.filter((q) => q.mediaKey !== it.mediaKey);
     this.queue.unshift(it);
-    this.seen.add(it.mediaKey);
+    this.markSeen(it);
   },
   drop(mediaKey) { this.queue = this.queue.filter((q) => q.mediaKey !== mediaKey); },
   sizeOf(it) { const i = this.info[it.mediaKey]; return (i && i.size) || 0; },
 
-  // Inclusive upper bound for a refetch after trash/restore mutates the
-  // library. Re-reading is harmless (decisions filter it); trusting an
-  // undocumented page token after rows disappear can skip photos.
+  // Where a refetch may safely restart after trash/restore mutates the
+  // library: the newest and the oldest photo that is still undecided (on
+  // screen or queued). Re-reading is harmless (decisions filter it); trusting
+  // an undocumented page token after rows disappear can skip photos.
   mutationBoundary() {
-    let newest = null;
+    let newest = null, oldest = null;
     const consider = (it) => {
-      if (it && typeof it.ts === 'number' && (newest === null || it.ts > newest)) newest = it.ts;
+      if (!it || typeof it.ts !== 'number') return;
+      if (newest === null || it.ts > newest) newest = it.ts;
+      if (oldest === null || it.ts < oldest) oldest = it.ts;
     };
     swipe.liveItems().forEach(consider);
     this.queue.forEach(consider);
-    return newest !== null ? newest : this.lastPageTs;
+    if (newest === null) newest = this.lastPageTs;
+    if (oldest === null && typeof this.chunkLo === 'number') oldest = this.chunkLo + 1;
+    return { newest: newest, oldest: oldest };
+  },
+
+  // Human-readable summary of the current scan for the app bar and the menu.
+  describe() {
+    const s = state.settings;
+    let order = t(s.order === 'oldest' ? 'orderOldest' : s.order === 'random' ? 'orderRandom' : 'orderNewest');
+    if (s.order === 'random' && !s.albumKey && this.sweeping) order = t('randomSweep');
+    const scope = s.albumKey ? (s.albumTitle || t('srcAlbum'))
+      : t(s.source === 2 ? 'srcArchive' : s.source === 3 ? 'srcBoth' : 'srcLib');
+    return { order: order, scope: scope, label: order + ' · ' + scope };
   },
 };
 
-// The resume cursor is the timestamp of the newest item that still has no
-// decision: whatever is on screen plus whatever is queued. Everything newer has
-// been kept (filtered by `kept`) or marked (filtered by `marked`, and persisted),
-// so restarting at "ts <= cursor" can neither skip nor repeat a photo. Being
-// derived, it needs no special handling for undo, resets or races.
+// The resume cursor is the timestamp of the item at the frontier of what still
+// has no decision: whatever is on screen plus whatever is queued. Newest first,
+// that is the newest such item (everything newer has been kept or marked) and
+// it lives in state.cursorTs; oldest first, it is the oldest and lives in
+// state.cursorFloorTs, so neither can ever be read with the other's meaning.
+// Random order and albums have no frontier. Being derived, the cursor needs no
+// special handling for undo, resets or races.
 function syncCursor() {
-  let newest = null;
+  if (!feed.plan || feed.plan.scope === 'album' || feed.plan.order === 'random') return;
+  const oldestFirst = feed.plan.order === 'oldest';
+  const field = oldestFirst ? 'cursorFloorTs' : 'cursorTs';
+  let edge = null;
   const consider = (it) => {
-    if (it && typeof it.ts === 'number' && (newest === null || it.ts > newest)) newest = it.ts;
+    if (!it || typeof it.ts !== 'number') return;
+    if (edge === null || (oldestFirst ? it.ts < edge : it.ts > edge)) edge = it.ts;
   };
   swipe.liveItems().forEach(consider);
   feed.queue.forEach(consider);
-  if (newest !== null && newest !== state.cursorTs) {
-    state.cursorTs = newest;
+  if (edge !== null && edge !== state[field]) {
+    state[field] = edge;
     persist();
   }
 }
@@ -2783,7 +3666,7 @@ const swipe = {
     this.busy = true;
     app.renderState();
     try {
-      await store.clearDisposition(item.mediaKey);
+      await store.clearDisposition(item);
       history.pop();
       if (entry.action === 'keep') {
         state.stats.kept = Math.max(0, state.stats.kept - 1);
@@ -2828,6 +3711,15 @@ const swipe = {
     }
   },
 
+  // A new scan replaces the cards, so swipe entries no longer point at anything
+  // on screen; a confirmed trash batch stays undoable because restoring it does
+  // not depend on the feed.
+  resetHistory() {
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].action !== 'trash') history.splice(i, 1);
+    }
+  },
+
   dropHistory(keys) {
     const gone = keys instanceof Set ? keys : new Set(keys || []);
     for (let i = history.length - 1; i >= 0; i--) {
@@ -2838,7 +3730,7 @@ const swipe = {
   // put an item back on top of the stack (undo)
   showOnTop(item) {
     feed.drop(item.mediaKey);
-    feed.seen.add(item.mediaKey);
+    feed.markSeen(item);
     if (this.back) { feed.putBack(this.back.item); this.back.el.remove(); this.back = null; }
     if (this.top) { feed.putBack(this.top.item); this.top.el.remove(); this.top = null; }
     const el = this.makeCard(item, false);
@@ -3206,6 +4098,7 @@ const review = {
       session.marked = Math.max(0, session.marked - all.length);
       state.sinceReview = 0;
       state.cursorTs = null;
+      state.cursorFloorTs = null;
       swipe.dropHistory(new Set(all.map((it) => it.mediaKey)));
       this.selected.clear();
       persist(true);
@@ -3371,13 +4264,13 @@ const review = {
       if (acknowledged.length) {
         app.snack(t('verifying'), { ms: 3000 });
         try {
-          trashKeys = await api.trashKeys({ retries: 2, want: acknowledged.map((i) => i.mediaKey) });
+          trashKeys = await api.trashKeys({ retries: 2, want: acknowledged });
           verificationWorked = true;
         } catch (e) {
           console.warn('[gpSwipe] trash listing verification failed', e);
         }
       }
-      const verifiedItems = verificationWorked ? acknowledged.filter((i) => trashKeys.has(i.mediaKey)) : [];
+      const verifiedItems = verificationWorked ? acknowledged.filter((i) => inTrash(trashKeys, i)) : [];
       let okItems = verifiedItems;
 
       // The local marked row and deletion log are one atomic commit. If that
@@ -3466,7 +4359,7 @@ const review = {
           // scan can prove an acknowledged item is no longer there.
           const trashKeys = await api.trashKeys({ retries: 2, scanAll: true });
           if (!trashKeys.complete) throw new Error('trash scan safety limit reached');
-          verified = acknowledged.filter((i) => !trashKeys.has(i.mediaKey));
+          verified = acknowledged.filter((i) => !inTrash(trashKeys, i));
         } catch (e) {
           console.warn('[gpSwipe] restore verification failed', e);
         }
@@ -3520,6 +4413,7 @@ const app = {
   hydrating: false,
   keysBound: false,
   dialogSeq: 0,
+  feedStarted: false,      // false while the startup scan menu is still deciding what to load
 
   // ---- construction ------------------------------------------------------
   build() {
@@ -3555,8 +4449,16 @@ const app = {
       onclick: fn, onmousedown: (e) => e.preventDefault(),
     }, icon(name));
 
+    this.modeLabel = h('span', { class: 'gps-mode-label', text: '' });
+    this.modeIcon = h('span', { class: 'gps-mode-ic' });
+    this.modeChip = h('button', {
+      class: 'gps-btn text gps-mode', title: t('scanChipHint') + ' (M)', 'aria-label': t('scanMode'),
+      onclick: () => this.openScanMenu(), onmousedown: (e) => e.preventDefault(),
+    }, this.modeIcon, this.modeLabel);
+
     this.bar = h('div', { class: 'gps-bar on-stage' },
       h('div', { class: 'gps-brand' }, brandMark(), h('span', { class: 'n', text: t('app') })),
+      this.modeChip,
       h('div', { class: 'gps-spacer' }),
       this.dryChip,
       this.countEl,
@@ -3680,8 +4582,13 @@ const app = {
     if (!G.at) this.snack(t('errToken'), { kind: 'err', ms: 9000 });
     swipe.clearCards();
     feed.reset();
-    this.showSwipe();
-    if (!state.introSeen) this.openIntro();
+    // The scan menu comes before the first card, so the listing waits for the
+    // user's choice instead of loading one order and then throwing it away.
+    const askMode = state.settings.showStartMenu === true;
+    this.feedStarted = false;
+    this.showSwipe({ deferLoad: askMode });
+    if (!state.introSeen) this.openIntro(askMode);
+    else if (askMode) this.openScanMenu({ startup: true });
     this.renderState();
     return true;
   },
@@ -3763,12 +4670,14 @@ const app = {
   },
 
   // ---- views -------------------------------------------------------------
-  showSwipe() {
+  showSwipe(o) {
     if (this.busy()) return;
     this.view = 'swipe';
     swipe.root.hidden = false;
     review.root.hidden = true;
     this.bar.className = 'gps-bar on-stage';
+    if (o && o.deferLoad) { this.renderState(); return; }
+    this.feedStarted = true;
     swipe.render();
     feed.ensure();
     this.renderState();
@@ -3789,8 +4698,9 @@ const app = {
   // Re-fetch inclusively from the last visible boundary; kept/marked/seen
   // filtering makes the overlap harmless while preventing skipped photos.
   invalidateFeed(boundary) {
+    const live = swipe.liveItems();
     swipe.clearCards();
-    feed.reset({ timestamp: boundary });
+    feed.afterMutation(boundary, live);
     if (this.view === 'swipe' && feed.ready) {
       swipe.render();
       feed.ensure();
@@ -3803,6 +4713,13 @@ const app = {
   renderState() {
     if (!this.built) return;
     this.dryChip.hidden = !state.settings.dryRun;
+    const mode = feed.describe();
+    this.modeLabel.textContent = mode.label;
+    this.modeChip.setAttribute('aria-label', t('scanMode') + ': ' + mode.label);
+    this.modeChip.title = mode.label + ' — ' + t('scanChipHint') + ' (M)';
+    clear(this.modeIcon);
+    this.modeIcon.appendChild(icon(state.settings.albumKey ? 'album'
+      : state.settings.order === 'oldest' ? 'sortOld' : state.settings.order === 'random' ? 'shuffle' : 'sortNew', 18));
     this.reviewBadge.textContent = fmtNum(marked.size);
     this.reviewBadge.hidden = marked.size === 0;
     const pendingLabel = marked.size ? t('reviewPending', { n: fmtNum(marked.size) }) : t('reviewBtn');
@@ -3828,7 +4745,13 @@ const app = {
     if (ph) ph.remove();
     if (!swipe.top) {
       if (this.hydrating || (feed.ready && feed.loading)) {
-        swipe.stage.appendChild(h('div', { class: 'gps-center' }, h('div', { class: 'gps-spin' }), h('div', { text: t('loading') })));
+        const pr = feed.progress;
+        let text = t('loading');
+        if (pr && pr.kind === 'album') text = typeof pr.n === 'number' ? t('albumLoading', { i: fmtNum(pr.i), n: fmtNum(pr.n) }) : t('albumLoadingN', { i: fmtNum(pr.i) });
+        else if (pr && pr.kind === 'oldest') text = t('oldestSearching');
+        swipe.stage.appendChild(h('div', { class: 'gps-center' }, h('div', { class: 'gps-spin' }), h('div', { text: text })));
+      } else if (feed.error === 'album-gone') {
+        // handled in onFeedChanged; nothing to paint for the one frame in between
       } else if (feed.error) {
         const scanPaused = feed.error === 'scan-paused';
         swipe.stage.appendChild(h('div', { class: 'gps-center' },
@@ -3837,14 +4760,27 @@ const app = {
           h('div', { text: t(scanPaused ? 'scanPausedSub' : 'errLoadSub') }),
           h('button', { class: 'gps-btn tonal', style: { marginTop: '8px' }, onclick: () => { feed.error = false; feed.ensure(); this.renderState(); } }, icon('undo', 18), h('span', { text: t('retry') })),
         ));
+      } else if (feed.exhausted && feed.albumEmpty) {
+        swipe.stage.appendChild(h('div', { class: 'gps-center' },
+          h('div', { class: 'ic' }, icon('album')),
+          h('div', { class: 'big', text: t('albumEmptyTitle') }),
+          h('div', { text: t(state.settings.albumOwner || feed.myActor ? 'albumEmptySub' : 'albumEmptySubPlain') }),
+          h('div', { class: 'row', style: { marginTop: '8px', justifyContent: 'center', flexWrap: 'wrap' } },
+            h('button', { class: 'gps-btn tonal', onclick: () => this.openScanMenu({ pickAlbum: true }) }, icon('album', 18), h('span', { text: t('pickAnotherAlbum') })),
+            h('button', { class: 'gps-btn', onclick: () => this.openScanMenu() }, icon('compass', 18), h('span', { text: t('scanMode') }))),
+        ));
       } else if (feed.exhausted) {
         swipe.stage.appendChild(h('div', { class: 'gps-center' },
           h('div', { class: 'ic' }, icon('check')),
           h('div', { class: 'big', text: t('doneTitle') }),
           h('div', { text: t('doneSub') }),
           h('div', { text: t('doneStats', { k: fmtNum(session.kept), d: fmtNum(session.deleted) }) }),
-          marked.size ? h('button', { class: 'gps-btn tonal', style: { marginTop: '8px' }, onclick: () => this.showReview() }, icon('grid', 18), h('span', { text: t('reviewBtn') + ' (' + fmtNum(marked.size) + ')' })) : null,
+          h('div', { class: 'row', style: { marginTop: '8px', justifyContent: 'center', flexWrap: 'wrap' } },
+            marked.size ? h('button', { class: 'gps-btn tonal', onclick: () => this.showReview() }, icon('grid', 18), h('span', { text: t('reviewBtn') + ' (' + fmtNum(marked.size) + ')' })) : null,
+            h('button', { class: 'gps-btn', onclick: () => this.openScanMenu() }, icon('compass', 18), h('span', { text: t('scanMode') }))),
         ));
+      } else if (feed.ready && !this.feedStarted) {
+        // the scan menu is deciding what to load; the stage stays quiet
       }
     }
     const has = !!swipe.top;
@@ -3856,7 +4792,23 @@ const app = {
     if (typeof onLauncherUpdate === 'function') onLauncherUpdate();
   },
 
-  onFeedChanged() { if (this.view === 'swipe') swipe.render(); else this.renderState(); },
+  onFeedChanged() {
+    if (feed.error === 'album-gone') { this.leaveAlbum(); return; }
+    if (this.view === 'swipe') swipe.render(); else this.renderState();
+  },
+
+  // The chosen album no longer answers (deleted, unshared, stale key): fall
+  // back to the library rather than looping on an error the user cannot fix.
+  leaveAlbum() {
+    const s = state.settings;
+    s.albumKey = null; s.albumTitle = ''; s.albumAuthKey = null; s.albumOwner = null;
+    state.cursorTs = null;
+    state.cursorFloorTs = null;
+    persist(true);
+    this.snack(t('albumGone'), { kind: 'err', ms: 7000 });
+    swipe.resetHistory();
+    this.reloadFeed();
+  },
   onInfoLoaded() { swipe.refreshMeta(); if (this.view === 'review') review.renderSummary(); },
 
   afterDecision(isUndo) {
@@ -3933,7 +4885,7 @@ const app = {
     const titleId = 'gps-dlg-title-' + (++this.dialogSeq);
     const title = o.title ? h('h2', { id: titleId, text: o.title }) : null;
     const panel = h('div', {
-      class: 'gps-dlg', role: 'dialog', 'aria-modal': 'true', tabindex: '-1',
+      class: 'gps-dlg' + (o.wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true', tabindex: '-1',
       'aria-labelledby': title ? titleId : null,
       'aria-label': title ? null : t('app'),
     },
@@ -3988,7 +4940,7 @@ const app = {
     return scrim;
   },
 
-  openIntro() {
+  openIntro(thenScanMenu) {
     const every = parseInt(state.settings.reviewEvery, 10) || 0;
     this.dialog({
       title: t('introTitle'),
@@ -3999,8 +4951,333 @@ const app = {
         every ? h('p', { text: t('intro3', { n: every }) }) : null,
         h('p', { text: t('intro4') }),
       ],
-      actions: [{ label: t('start'), primary: true, onClick: () => { state.introSeen = true; persist(true); } }],
+      actions: [{ label: t('start'), primary: true, onClick: () => {
+        state.introSeen = true; persist(true);
+        if (thenScanMenu) setTimeout(() => this.openScanMenu({ startup: true }), 0);
+      } }],
     });
+  },
+
+  // ---- scan menu -----------------------------------------------------------
+  // What to review and in which order. Opened before the first card (unless the
+  // user turned that off), from the app-bar chip, from Settings and with M.
+  // `o.startup` = the feed has not been started for this open yet, so leaving
+  // the menu by any route starts it with whatever is selected.
+  openScanMenu(o) {
+    o = o || {};
+    if (this.busy() || (this.dialogOpen() && !o.reopen)) return;
+    const s = state.settings;
+    const d = o.draft || {
+      order: s.order, source: s.source, scope: s.albumKey ? 'album' : 'library',
+      albumKey: s.albumKey, albumTitle: s.albumTitle, albumAuthKey: s.albumAuthKey, albumOwner: s.albumOwner, albumThumb: null,
+      dateFrom: s.dateFrom, dateTo: s.dateTo, mediaType: s.mediaType, skipFav: s.skipFav, resume: s.resume,
+      showStartMenu: s.showStartMenu,
+    };
+    let settled = false;   // Start pressed or the picker took over: onDismiss must not act
+    if (o.pickAlbum) {
+      // straight into the album list, then back here with the choice
+      settled = true;
+      this.openAlbumPicker({
+        onPick: (a) => {
+          d.scope = 'album'; d.albumKey = a.mediaKey; d.albumTitle = a.title; d.albumAuthKey = a.authKey; d.albumOwner = a.ownerActor; d.albumThumb = a.thumb;
+          this.openScanMenu({ startup: o.startup, draft: d, reopen: true });
+        },
+        onCancel: () => this.openScanMenu({ startup: o.startup, draft: d, reopen: true }),
+      });
+      return null;
+    }
+    // Nothing to change and a place to pick up from: the primary action reads
+    // "continue" and says where, so a returning user does not re-read the form.
+    const resumable = () => d.resume && d.scope !== 'album' && d.order !== 'random'
+      && typeof state[d.order === 'oldest' ? 'cursorFloorTs' : 'cursorTs'] === 'number';
+    const summary = h('p', { class: 'hi', hidden: true });
+
+    // order
+    const orderBtns = {};
+    const orderGroup = h('div', { class: 'gps-cards', role: 'radiogroup', 'aria-label': t('scanOrder') });
+    [['newest', 'sortNew'], ['oldest', 'sortOld'], ['random', 'shuffle']].forEach(([key, ico]) => {
+      const cap = key[0].toUpperCase() + key.slice(1);
+      const b = h('button', {
+        type: 'button', class: 'gps-choice', role: 'radio', 'data-order': key,
+        onclick: () => { d.order = key; paint(); },
+      }, h('span', { class: 'ic' }, icon(ico, 22)),
+      h('span', { class: 'tt' }, h('b', { text: t('order' + cap) }), h('span', { class: 'hint', text: t('order' + cap + 'Hint') })));
+      orderBtns[key] = b;
+      orderGroup.appendChild(b);
+    });
+
+    // scope
+    const scopeSel = h('select', { 'aria-label': t('source') },
+      h('option', { value: '1', text: t('srcLib') }),
+      h('option', { value: '2', text: t('srcArchive') }),
+      h('option', { value: '3', text: t('srcBoth') }),
+      h('option', { value: 'album', text: t('srcAlbum') }));
+    const albumName = h('b');
+    const albumSub = h('span', { class: 'hint' });
+    const albumArt = h('span', { class: 'ph' }, icon('album', 20));
+    const pickBtn = h('button', { type: 'button', class: 'gps-btn text', onclick: () => toPicker() }, h('span'));
+    const albumRow = h('div', { class: 'gps-album-row', hidden: true }, albumArt, h('span', { class: 'tt' }, albumName, albumSub), pickBtn);
+    const toPicker = () => {
+      settled = true;
+      this.openAlbumPicker({
+        onPick: (a) => {
+          d.scope = 'album'; d.albumKey = a.mediaKey; d.albumTitle = a.title; d.albumAuthKey = a.authKey; d.albumOwner = a.ownerActor; d.albumThumb = a.thumb;
+          this.openScanMenu({ startup: o.startup, draft: d, reopen: true });
+        },
+        onCancel: () => {
+          if (!d.albumKey) { d.scope = 'library'; }
+          this.openScanMenu({ startup: o.startup, draft: d, reopen: true });
+        },
+      });
+    };
+    scopeSel.addEventListener('change', () => {
+      if (scopeSel.value === 'album') {
+        d.scope = 'album';
+        if (!d.albumKey) { toPicker(); return; }
+      } else {
+        d.scope = 'library';
+        d.source = parseInt(scopeSel.value, 10) || 1;
+      }
+      paint();
+    });
+
+    // filters
+    const from = h('input', { type: 'date', 'aria-label': t('dateFrom') }); from.value = d.dateFrom || '';
+    const to = h('input', { type: 'date', 'aria-label': t('dateTo') }); to.value = d.dateTo || '';
+    const media = h('select', { 'aria-label': t('mediaType') },
+      h('option', { value: 'all', text: t('mediaAll') }),
+      h('option', { value: 'photo', text: t('mediaPhoto') }),
+      h('option', { value: 'video', text: t('mediaVideo') }));
+    media.value = d.mediaType;
+    const cb = (checked) => h('input', { type: 'checkbox', checked: checked || null });
+    const skipF = cb(d.skipFav), resume = cb(d.resume), showMenu = cb(d.showStartMenu);
+    const err = h('span', { class: 'hint gps-err', role: 'alert', hidden: true, text: t('dateRangeInvalid') });
+    const skipFavHint = h('span', { class: 'hint', hidden: true, text: t('skipFavAlbumHint') });
+    const resumeHint = h('span', { class: 'hint', text: t('resumeHint') });
+    const filtersBody = h('div', { class: 'gps-filters', hidden: true },
+      h('div', { class: 'gps-sec' }, h('span', { class: 'lbl', text: t('dateRange') }),
+        h('div', { class: 'gps-daterange' }, h('label', null, t('dateFrom'), from), h('label', null, t('dateTo'), to)),
+        err, h('span', { class: 'hint', text: t('dateRangeHint') })),
+      h('label', null, t('mediaType'), media),
+      h('label', { class: 'row' }, skipF, h('span', { text: t('skipFav') })),
+      skipFavHint,
+      h('label', { class: 'row' }, resume, h('span', { text: t('resume') })),
+      resumeHint);
+    const filterBadge = h('span', { class: 'gps-badge', hidden: true, text: '0' });
+    const filtersToggle = h('button', { type: 'button', class: 'gps-btn text gps-filters-toggle', 'aria-expanded': 'false' },
+      icon('tune', 18), h('span', { text: t('filters') }), filterBadge);
+    filtersToggle.addEventListener('click', () => {
+      filtersBody.hidden = !filtersBody.hidden;
+      filtersToggle.setAttribute('aria-expanded', filtersBody.hidden ? 'false' : 'true');
+    });
+    const activeFilters = () => (from.value ? 1 : 0) + (to.value ? 1 : 0) + (media.value !== 'all' ? 1 : 0) + (skipF.checked && d.scope !== 'album' ? 1 : 0);
+    const valid = () => !(from.value && to.value && from.value > to.value);
+    // What Start would change, compared with the saved scan.
+    const changed = () => {
+      const toAlbum = d.scope === 'album' && !!d.albumKey;
+      return d.order !== s.order
+        || toAlbum !== !!s.albumKey || (toAlbum && d.albumKey !== s.albumKey)
+        || (!toAlbum && d.source !== s.source)
+        || (from.value || '') !== (s.dateFrom || '') || (to.value || '') !== (s.dateTo || '')
+        || media.value !== s.mediaType || skipF.checked !== s.skipFav || resume.checked !== s.resume;
+    };
+
+    let startBtn = null;
+    const paint = () => {
+      for (const key in orderBtns) orderBtns[key].setAttribute('aria-checked', d.order === key ? 'true' : 'false');
+      scopeSel.value = d.scope === 'album' ? 'album' : String(d.source);
+      albumRow.hidden = d.scope !== 'album';
+      albumName.textContent = d.albumKey ? (d.albumTitle || t('srcAlbum')) : t('noAlbumPicked');
+      albumSub.textContent = d.albumKey ? t('srcAlbum') : '';
+      clear(pickBtn); pickBtn.appendChild(h('span', { text: d.albumKey ? t('changeAlbum') : t('pickAlbum') }));
+      clear(albumArt);
+      if (d.albumThumb && googleMediaBase(d.albumThumb)) {
+        const im = h('img', { alt: '' }); im.src = imgUrl({ thumb: d.albumThumb }, 120); albumArt.appendChild(im);
+      } else albumArt.appendChild(icon('album', 20));
+      resume.disabled = d.order === 'random' || d.scope === 'album';
+      resumeHint.hidden = !resume.disabled;
+      skipF.disabled = d.scope === 'album';
+      skipFavHint.hidden = !skipF.disabled;
+      const n = activeFilters();
+      filterBadge.hidden = n === 0; filterBadge.textContent = String(n);
+      if (n && filtersBody.hidden && !paint.opened) { filtersBody.hidden = false; filtersToggle.setAttribute('aria-expanded', 'true'); }
+      paint.opened = true;
+      err.hidden = valid();
+      const cont = !changed() && resumable();
+      if (cont) {
+        const at = state[d.order === 'oldest' ? 'cursorFloorTs' : 'cursorTs'];
+        summary.textContent = t('resumeSummary', { d: fmtDate({ ts: at, tz: 0 }), dir: t(d.order === 'oldest' ? 'resumeForward' : 'resumeBackward') });
+      }
+      summary.hidden = !cont;
+      if (startBtn) {
+        startBtn.disabled = !valid();
+        startBtn.textContent = cont ? t('continueBtn') : t('start');
+      }
+    };
+    [from, to, media, skipF].forEach((el) => el.addEventListener('change', paint));
+    [from, to].forEach((el) => el.addEventListener('input', paint));
+
+    const apply = () => {
+      if (!valid()) return false;
+      const toAlbum = d.scope === 'album' && !!d.albumKey;
+      const feedChanged = changed();
+      s.order = d.order;
+      s.source = d.source;
+      if (toAlbum) { s.albumKey = d.albumKey; s.albumTitle = d.albumTitle || ''; s.albumAuthKey = d.albumAuthKey || null; s.albumOwner = d.albumOwner || null; }
+      else { s.albumKey = null; s.albumTitle = ''; s.albumAuthKey = null; s.albumOwner = null; }
+      s.dateFrom = from.value || '';
+      s.dateTo = to.value || '';
+      s.mediaType = media.value;
+      s.skipFav = skipF.checked;
+      s.resume = resume.checked;
+      s.showStartMenu = showMenu.checked;
+      if (feedChanged) { state.cursorTs = null; state.cursorFloorTs = null; }
+      persist(true);
+      if (feedChanged || !this.feedStarted) {
+        if (feedChanged) swipe.resetHistory();
+        this.reloadFeed();
+      } else {
+        this.renderState();
+      }
+      return true;
+    };
+
+    // Cancel and Start behave the same when nothing changed; on the startup
+    // menu, Cancel simply starts the scan as it was.
+    const actions = [{ label: t('cancel') }];
+    actions.push({ label: t('start'), primary: true, keepOpen: true, onClick: () => {
+      if (!apply()) return;
+      settled = true;
+      this.closeDialog(true);
+    } });
+    const scrim = this.dialog({
+      title: t('scanMenuTitle'),
+      wide: true,
+      onDismiss: () => {
+        // leaving the startup menu by Escape or the scrim starts the scan as is
+        if (!settled && o.startup && !this.feedStarted && !this.busy()) this.reloadFeed();
+      },
+      body: [
+        summary,
+        h('div', { class: 'gps-sec' }, h('span', { class: 'lbl', text: t('scanOrder') }), orderGroup),
+        h('div', { class: 'gps-sec' }, h('span', { class: 'lbl', text: t('source') }), scopeSel, albumRow),
+        filtersToggle,
+        filtersBody,
+        h('div', { class: 'gps-foot' }, h('label', { class: 'row' }, showMenu, h('span', { text: t('showStartMenu') }))),
+      ],
+      actions: actions,
+    });
+    startBtn = scrim.querySelector('.acts .gps-btn.filled');
+    paint();
+    return scrim;
+  },
+
+  // Albums the user made, newest activity first. Albums shared TO the user are
+  // left out: their rows are not in this library and cannot be trashed here.
+  openAlbumPicker(o) {
+    const list = h('div', { class: 'gps-albums', role: 'listbox', 'aria-label': t('pickAlbum') });
+    const search = h('input', { type: 'search', placeholder: t('albumSearch'), 'aria-label': t('albumSearch') });
+    const status = h('div', { class: 'gps-center gps-albums-status', style: { position: 'relative' }, hidden: true });
+    const more = h('button', { type: 'button', class: 'gps-btn text', hidden: true }, h('span', { text: t('albumsMore') }));
+    const albums = [];
+    const seen = new Set();
+    const tokens = new Set();
+    let nextPageId = null, pages = 0, loading = false, failed = false, done = false, picked = false, closed = false;
+    const ALBUMS_MAX_PAGES = 20;   // 2000 albums before "load more" becomes a manual step
+
+    const years = (a) => {
+      const y = (ts) => (typeof ts === 'number' ? new Date(ts).getUTCFullYear() : null);
+      const a0 = y(a.startTs), a1 = y(a.endTs);
+      if (a0 === null && a1 === null) return '';
+      if (a0 === null || a1 === null || a0 === a1) return String(a0 === null ? a1 : a0);
+      return a0 + ' – ' + a1;
+    };
+    const row = (a) => {
+      const art = h('span', { class: 'ph' }, icon('album', 20));
+      if (a.thumb && googleMediaBase(a.thumb)) {
+        const im = h('img', { alt: '', loading: 'lazy', decoding: 'async' });
+        im.addEventListener('error', () => { clear(art); art.appendChild(icon('album', 20)); }, { once: true });
+        im.src = imgUrl({ thumb: a.thumb }, 120);
+        clear(art); art.appendChild(im);
+      }
+      const bits = [];
+      if (typeof a.itemCount === 'number') bits.push(t('albumCount', { n: fmtNum(a.itemCount) }));
+      const yr = years(a);
+      if (yr) bits.push(yr);
+      const label = (a.title || t('srcAlbum')) + (bits.length ? ', ' + bits.join(', ') : '') + (a.isShared ? ', ' + t('albumShared') : '');
+      return h('button', { type: 'button', class: 'gps-album', role: 'option', 'aria-label': label, onclick: () => pick(a) },
+        art,
+        h('span', { class: 'tt' }, h('b', { text: a.title || t('srcAlbum') }), h('span', { class: 'hint', text: bits.join(' · ') })),
+        a.isShared ? h('span', { class: 'sh', text: t('albumShared') }) : null);
+    };
+    const render = () => {
+      if (closed) return;
+      clear(list);
+      const q = search.value.trim().toLowerCase();
+      const shown = albums.filter((a) => !q || (a.title || '').toLowerCase().indexOf(q) !== -1);
+      shown.forEach((a) => list.appendChild(row(a)));
+      clear(status);
+      status.hidden = false;
+      if (loading) status.append(h('div', { class: 'gps-spin' }), h('div', { text: albums.length ? t('albumsLoadingN', { n: fmtNum(albums.length) }) : t('albumsLoading') }));
+      else if (failed) status.append(h('div', { text: t('albumsError') }),
+        h('button', { type: 'button', class: 'gps-btn tonal', onclick: () => loadAll() }, icon('undo', 18), h('span', { text: t('retry') })));
+      else if (!shown.length && done) status.append(h('div', { text: t('albumsEmpty') }));
+      else status.hidden = true;
+      // only when the page cap stopped the automatic walk does "more" appear
+      more.hidden = loading || failed || done || !nextPageId;
+    };
+    const loadPage = async () => {
+      const key = nextPageId === null ? '__first__' : String(nextPageId);
+      if (tokens.has(key)) throw new Error('pagination token repeated: ' + key);
+      const page = await api.listAlbums({ pageId: nextPageId });
+      tokens.add(key);
+      pages++;
+      for (const a of page.albums) {
+        // kind 4 = shared with the user by somebody else: not this library
+        if (a.kind === 4) continue;
+        if (seen.has(a.mediaKey)) continue;
+        seen.add(a.mediaKey);
+        albums.push(a);
+      }
+      nextPageId = page.nextPageId;
+      if (!nextPageId) done = true;
+    };
+    // Google returns albums by recent activity, so the old ones a cleanup
+    // reaches for sit on later pages; read them all before the filter is
+    // trusted, painting as pages arrive.
+    const loadAll = async () => {
+      if (loading || closed) return;
+      loading = true; failed = false; render();
+      try {
+        while (!done && pages < ALBUMS_MAX_PAGES && !closed) { await loadPage(); render(); }
+      } catch (e) {
+        console.warn('[gpSwipe] could not list albums', e);
+        failed = true;
+      } finally {
+        loading = false;
+        render();
+      }
+    };
+    more.addEventListener('click', async () => {
+      if (loading || closed) return;
+      loading = true; failed = false; render();
+      try { await loadPage(); } catch (e) { failed = true; } finally { loading = false; render(); }
+    });
+    search.addEventListener('input', render);
+    const pick = (a) => {
+      picked = true; closed = true;
+      this.closeDialog(true, true);
+      o.onPick({ mediaKey: a.mediaKey, title: a.title, authKey: a.authKey, ownerActor: a.ownerActor, thumb: a.thumb });
+    };
+    this.dialog({
+      title: t('pickAlbum'),
+      wide: true,
+      onDismiss: () => { closed = true; if (!picked) o.onCancel(); },
+      body: [search, h('p', { class: 'hint', text: t('albumSharedHint') }), list, status, more],
+      actions: [{ label: t('cancel'), onClick: () => { picked = true; closed = true; o.onCancel(); } }],
+    });
+    search.focus({ preventScroll: true });
+    loadAll();
   },
 
   openHelp() {
@@ -4024,12 +5301,6 @@ const app = {
     if (this.busy() || this.dialogOpen()) return;
     const s = state.settings;
     const originalTheme = s.theme;
-    const src = h('select', null,
-      h('option', { value: '1', text: t('srcLib') }),
-      h('option', { value: '2', text: t('srcArchive') }),
-      h('option', { value: '3', text: t('srcBoth') }));
-    src.value = String(s.source);
-    const date = h('input', { type: 'date' }); date.value = s.startDate || '';
     const every = h('input', { type: 'number', min: '0', max: '1000', step: '10' }); every.value = String(s.reviewEvery);
     const theme = h('select', null,
       h('option', { value: 'auto', text: t('themeAuto') }),
@@ -4042,7 +5313,11 @@ const app = {
       ...LANGUAGE_CODES.map((code) => h('option', { value: code, text: LANGUAGE_LABELS[code] })));
     language.value = LANGUAGE_CODES.indexOf(s.language) !== -1 ? s.language : 'auto';
     const cb = (checked) => h('input', { type: 'checkbox', checked: checked || null });
-    const resume = cb(s.resume), skipV = cb(s.skipVideos), skipF = cb(s.skipFav), dry = cb(s.dryRun);
+    const dry = cb(s.dryRun);
+
+    const mode = feed.describe();
+    const scanBtn = h('button', { class: 'gps-btn tonal', style: { alignSelf: 'flex-start' } }, icon('compass', 18), h('span', { text: t('scanMode') + ' · ' + mode.label }));
+    scanBtn.addEventListener('click', () => { this.applyTheme(originalTheme); this.closeDialog(true, true); this.openScanMenu(); });
 
     const exportBtn = h('button', { class: 'gps-btn text' }, icon('openNew', 18), h('span', { text: t('exportLog') }));
     exportBtn.addEventListener('click', async () => {
@@ -4072,8 +5347,9 @@ const app = {
               await store.keepClear();
               state.stats.kept = Math.max(0, state.stats.kept - n);
               state.cursorTs = null;
+              state.cursorFloorTs = null;
               persist(true);
-              history.length = 0;
+              swipe.resetHistory();
               this.reloadFeed();
             } catch (e) {
               console.error('[gpSwipe] could not reset kept photos', e);
@@ -4088,14 +5364,10 @@ const app = {
       title: t('settings'),
       onDismiss: () => this.applyTheme(originalTheme),
       body: [
-        h('label', null, t('source'), src),
-        h('label', null, t('startDate'), date, h('span', { class: 'hint', text: t('startDateHint') })),
+        scanBtn,
         h('label', null, t('reviewEvery'), every, h('span', { class: 'hint', text: t('reviewEveryHint') })),
         h('label', null, t('language'), language),
         h('label', null, t('theme'), theme),
-        h('label', { class: 'row' }, resume, h('span', { text: t('resume') })),
-        h('label', { class: 'row' }, skipV, h('span', { text: t('skipVideos') })),
-        h('label', { class: 'row' }, skipF, h('span', { text: t('skipFav') })),
         h('label', { class: 'row' }, dry, h('span', { text: t('dryRun') })),
         h('span', { class: 'hint', text: t('dryRunHint') }),
         exportBtn,
@@ -4104,31 +5376,15 @@ const app = {
       actions: [
         { label: t('cancel'), onClick: () => this.applyTheme() },
         { label: t('save'), primary: true, onClick: () => {
-          const newSource = parseInt(src.value, 10) || 1;
-          const feedChanged = (date.value || '') !== (s.startDate || '') || newSource !== s.source
-            || resume.checked !== s.resume || skipV.checked !== s.skipVideos || skipF.checked !== s.skipFav;
-          s.source = newSource;
-          s.startDate = date.value || '';
-          s.resume = resume.checked;
-          s.skipVideos = skipV.checked;
-          s.skipFav = skipF.checked;
           s.reviewEvery = Math.max(0, Math.min(1000, parseInt(every.value, 10) || 0));
           s.language = language.value === 'auto' || LANGUAGE_CODES.indexOf(language.value) !== -1 ? language.value : 'auto';
           s.theme = theme.value;
           s.dryRun = dry.checked;
-          if (feedChanged) state.cursorTs = null;
           persist(true);
           this.applyTheme();
           const languageChanged = setLanguage(s.language);
-          if (languageChanged) {
-            this.rebuildForLanguage();
-          }
-          if (feedChanged) {
-            history.length = 0;
-            this.reloadFeed();
-          } else if (!languageChanged) {
-            this.renderState();
-          }
+          if (languageChanged) this.rebuildForLanguage();
+          else this.renderState();
         } },
       ],
     });
@@ -4139,6 +5395,7 @@ const app = {
     swipe.clearCards();
     if (this.bannerEl) { this.bannerEl.remove(); this.bannerEl = null; }
     feed.reset();
+    this.feedStarted = true;
     this.showSwipe();
     feed.ensure();
   },
@@ -4164,7 +5421,17 @@ const app = {
 
       if (lightbox) { if (!typing && !activates) { if (lightbox._keys(e)) stop(); else if (e.key !== 'Tab') stop(); } return; }
       if (dialog) {
+        const group = inside && tgt.getAttribute && tgt.getAttribute('role') === 'radio' ? tgt.closest('[role=radiogroup]') : null;
         if (e.key === 'Escape') { stop(); this.closeDialog(); }
+        else if (group && e.key.startsWith('Arrow')) {
+          // roving selection over the menu's radio cards
+          stop();
+          const radios = Array.from(group.querySelectorAll('[role=radio]'));
+          const i = radios.indexOf(tgt);
+          const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
+          const next = radios[(i + step + radios.length) % radios.length];
+          if (next) { next.focus({ preventScroll: true }); next.click(); }
+        }
         else if (e.key === 'Tab' || typing || activates) { /* native focus / typing */ }
         else stop();
         return;
@@ -4181,6 +5448,7 @@ const app = {
           case 'PageDown': stop(); review.scroll.scrollBy({ top: review.scroll.clientHeight * 0.9, behavior: 'smooth' }); return;
           case 'PageUp': stop(); review.scroll.scrollBy({ top: -review.scroll.clientHeight * 0.9, behavior: 'smooth' }); return;
           case 's': case 'S': stop(); this.openSettings(); return;
+          case 'm': case 'M': stop(); this.openScanMenu(); return;
           case '?': stop(); this.openHelp(); return;
           default: if (e.key.length === 1 || e.key.startsWith('Arrow')) stop(); return;
         }
@@ -4195,6 +5463,7 @@ const app = {
         case 'v': case 'V': stop(); swipe.act('video'); break;
         case 'r': case 'R': stop(); this.showReview(); break;
         case 's': case 'S': stop(); this.openSettings(); break;
+        case 'm': case 'M': stop(); this.openScanMenu(); break;
         case '?': stop(); this.openHelp(); break;
         case 'Escape': stop(); this.requestClose(); break;
         default: if (e.key.length === 1 || e.key.startsWith('Arrow')) stop();

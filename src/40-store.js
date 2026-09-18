@@ -20,31 +20,70 @@ const IDB_VERSION = 2;
 const STORE_TIMEOUT_MS = 5000;
 const LOCK_TIMEOUT_MS = 5000;
 
+const SCAN_ORDERS = ['newest', 'oldest', 'random'];
+const MEDIA_TYPES = ['all', 'photo', 'video'];
+
 const DEFAULTS = {
   settings: {
-    source: 1,            // 1 library · 2 archive · 3 both
-    startDate: '',
-    resume: true,
-    skipVideos: false,
+    // --- what the scan covers; changing any of these restarts the feed ---
+    order: 'newest',      // newest · oldest · random
+    source: 1,            // 1 library · 2 archive · 3 both (ignored while an album is chosen)
+    albumKey: null,       // scan one album instead of the library
+    albumTitle: '',
+    albumAuthKey: null,
+    albumOwner: null,     // the album owner's actor id, i.e. the user's own
+    dateFrom: '',         // oldest day to include, YYYY-MM-DD ('' = no bound)
+    dateTo: '',           // newest day to include, YYYY-MM-DD ('' = no bound)
+    mediaType: 'all',     // all · photo · video
     skipFav: false,
+    resume: true,         // sequential orders continue from the last undecided photo
+    showStartMenu: true,  // offer the scan menu every time the app opens
+    // --- everything else ---
     reviewEvery: 100,     // ask for a review after this many decisions (0 = never ask)
     theme: 'auto',        // auto · dark · light
     language: 'auto',     // auto · tr · en · it · es · de
     dryRun: false,        // run the whole flow but never send a delete request
   },
   stats: { kept: 0, deleted: 0, freedBytes: 0 },
-  cursorTs: null,         // resume position: newest still-undecided timestamp
+  cursorTs: null,         // resume position, newest first: the newest still-undecided timestamp (inclusive upper bound)
+  cursorFloorTs: null,    // resume position, oldest first: every photo at or below this has a decision
+  floorTs: null,          // hint only: a timestamp the library had nothing at or below, last time we looked
   sinceReview: 0,
   introSeen: false,
 };
+
+const isDay = (v) => typeof v === 'string' && (v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v));
 
 function readState() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(LS_STATE) || '{}') || {}; } catch (e) { saved = {}; }
   const s = Object.assign({}, DEFAULTS, saved);
-  s.settings = Object.assign({}, DEFAULTS.settings, saved.settings || {});
+  const legacy = saved.settings && typeof saved.settings === 'object' ? saved.settings : {};
+  s.settings = Object.assign({}, DEFAULTS.settings, legacy);
+  // Settings written before the scan menu existed: the single start date was
+  // an upper bound, and "skip videos" is now the photos-only media type.
+  if (!('dateTo' in legacy) && isDay(legacy.startDate)) s.settings.dateTo = legacy.startDate;
+  if (!('mediaType' in legacy) && legacy.skipVideos === true) s.settings.mediaType = 'photo';
+  delete s.settings.startDate;
+  delete s.settings.skipVideos;
+  if (SCAN_ORDERS.indexOf(s.settings.order) === -1) s.settings.order = 'newest';
+  if (MEDIA_TYPES.indexOf(s.settings.mediaType) === -1) s.settings.mediaType = 'all';
+  if ([1, 2, 3].indexOf(s.settings.source) === -1) s.settings.source = 1;
+  if (!isDay(s.settings.dateFrom)) s.settings.dateFrom = '';
+  if (!isDay(s.settings.dateTo)) s.settings.dateTo = '';
+  if (typeof s.settings.albumKey !== 'string' || !s.settings.albumKey) {
+    s.settings.albumKey = null; s.settings.albumTitle = ''; s.settings.albumAuthKey = null; s.settings.albumOwner = null;
+  }
+  if (typeof s.settings.albumTitle !== 'string') s.settings.albumTitle = '';
+  for (const k of ['albumAuthKey', 'albumOwner']) {
+    if (typeof s.settings[k] !== 'string' || !s.settings[k]) s.settings[k] = null;
+  }
+  s.settings.showStartMenu = s.settings.showStartMenu !== false;
   s.stats = Object.assign({}, DEFAULTS.stats, saved.stats || {});
   if (typeof s.sinceReview !== 'number' || s.sinceReview < 0) s.sinceReview = 0;
+  for (const k of ['cursorTs', 'cursorFloorTs', 'floorTs']) {
+    if (typeof s[k] !== 'number' || !Number.isFinite(s[k])) s[k] = null;
+  }
   return s;
 }
 
@@ -59,8 +98,57 @@ function reloadState() {
   Object.assign(state, fresh);
 }
 
+// A photo has two identifiers: its `mediaKey`, which differs between the
+// library listing and an album listing of the very same photo, and its
+// `dedupKey`, which is the same everywhere and is what the trash RPC takes.
+// Decisions are therefore recorded under both, so a photo kept or marked in one
+// scan cannot be offered again from another.
 const kept = new Set();         // mediaKey -> decided "keep"
-const marked = new Map();       // mediaKey -> item, waiting for the user to confirm deletion
+const keptDedupOf = new Map();  // kept mediaKey -> its dedupKey, when known (rows store it as their value)
+const keptDedup = new Map();    // dedupKey -> how many kept rows carry it
+const DEDUP_PREFIX = 'd:';      // namespaces dedup keys where they share a set with media keys
+const dedupOf = (item) => (item && typeof item.dedupKey === 'string' && item.dedupKey ? item.dedupKey : null);
+
+class MarkedMap extends Map {
+  constructor() { super(); this.byDedup = new Map(); }   // dedupKey -> mediaKey
+  set(key, item) {
+    const prev = super.get(key);
+    if (prev && prev.dedupKey && this.byDedup.get(prev.dedupKey) === key) this.byDedup.delete(prev.dedupKey);
+    super.set(key, item);
+    if (item && item.dedupKey) this.byDedup.set(item.dedupKey, key);
+    return this;
+  }
+  delete(key) {
+    const prev = super.get(key);
+    if (prev && prev.dedupKey && this.byDedup.get(prev.dedupKey) === key) this.byDedup.delete(prev.dedupKey);
+    return super.delete(key);
+  }
+  clear() { super.clear(); this.byDedup.clear(); }
+  hasDedup(dedupKey) { return typeof dedupKey === 'string' && this.byDedup.has(dedupKey); }
+}
+const marked = new MarkedMap(); // mediaKey -> item, waiting for the user to confirm deletion
+
+// True when this photo (by either identifier) already has a decision.
+const isKept = (item) => !!item && (kept.has(item.mediaKey) || (typeof item.dedupKey === 'string' && keptDedup.has(item.dedupKey)));
+function keptAdd(mediaKey, dedupKey) {
+  kept.add(mediaKey);
+  if (!dedupKey || keptDedupOf.get(mediaKey) === dedupKey) return;
+  const old = keptDedupOf.get(mediaKey);
+  if (old) keptDedupDrop(old);
+  keptDedupOf.set(mediaKey, dedupKey);
+  keptDedup.set(dedupKey, (keptDedup.get(dedupKey) || 0) + 1);
+}
+function keptDedupDrop(dedupKey) {
+  const n = (keptDedup.get(dedupKey) || 0) - 1;
+  if (n > 0) keptDedup.set(dedupKey, n); else keptDedup.delete(dedupKey);
+}
+function keptRemove(mediaKey) {
+  kept.delete(mediaKey);
+  const d = keptDedupOf.get(mediaKey);
+  if (d) { keptDedupOf.delete(mediaKey); keptDedupDrop(d); }
+}
+function keptClearAll() { kept.clear(); keptDedupOf.clear(); keptDedup.clear(); }
+const isMarked = (item) => !!item && (marked.has(item.mediaKey) || marked.hasDedup(item.dedupKey));
 
 let persistTimer = null;
 function persist(now) {
@@ -272,8 +360,12 @@ const store = {
 
   async refresh() {
     this._assertUsable();
-    const nextKept = new Set();
+    const nextKept = [];   // [mediaKey, dedupKey|null]
     const nextMarked = new Map();
+    const acceptKept = (k, v) => {
+      if (!validRpcKey(k)) throw new Error('invalid local kept row');
+      nextKept.push([k, typeof v === 'string' && validRpcKey(v) ? v : null]);
+    };
     const acceptMarked = (it) => {
       if (!validMarkedItem(it) || nextMarked.has(it.mediaKey)) throw new Error('invalid local marked row');
       nextMarked.set(it.mediaKey, it);
@@ -283,17 +375,23 @@ const store = {
       // which is why the UI keeps the IndexedDB warning visible.
       for (const k of LS_KEPT_LEGACY) {
         const raw = localStorage.getItem(k);
-        if (raw) raw.split('\n').filter(Boolean).forEach((key) => nextKept.add(key));
+        if (raw) raw.split('\n').filter(Boolean).forEach((line) => { const parts = line.split('\t'); acceptKept(parts[0], parts[1]); });
       }
       const m = JSON.parse(localStorage.getItem(LS_STATE + '.marked') || '[]');
       if (!Array.isArray(m)) throw new Error('invalid local marked snapshot');
       m.forEach(acceptMarked);
     } else {
-      const keys = await this.tx('kept', 'readonly', (st) => st.getAllKeys());
-      (keys || []).forEach((k) => {
-        if (!validRpcKey(k)) throw new Error('invalid local kept row');
-        nextKept.add(k);
+      // keys and values of the same store in one transaction; both come back
+      // in key order, so they line up
+      let keys = null, values = null;
+      await this._tx('kept', 'readonly', (tx) => {
+        const st = tx.objectStore('kept');
+        const rk = st.getAllKeys(); rk.onsuccess = () => { keys = rk.result; };
+        const rv = st.getAll(); rv.onsuccess = () => { values = rv.result; };
+        return rv;
       });
+      if (!Array.isArray(keys) || !Array.isArray(values) || keys.length !== values.length) throw new Error('invalid local kept snapshot');
+      keys.forEach((k, i) => acceptKept(k, values[i]));
       const rows = await this.tx('marked', 'readonly', (st) => st.getAll());
       (rows || []).forEach(acceptMarked);
     }
@@ -301,8 +399,8 @@ const store = {
     // Swap only after every read succeeded. A partial snapshot must never be
     // exposed to the feed, because it could offer a pending-delete item again.
     this._assertUsable();
-    kept.clear();
-    nextKept.forEach((k) => kept.add(k));
+    keptClearAll();
+    nextKept.forEach(([k, d]) => keptAdd(k, d));
     marked.clear();
     nextMarked.forEach((it, k) => marked.set(k, it));
   },
@@ -429,40 +527,37 @@ const store = {
   },
   _warn(e) { console.warn('[gpSwipe] IndexedDB write failed', e); },
 
-  keepAdd(key) {
-    this._assertUsable();
-    kept.add(key);
-    if (this.db) return this.tx('kept', 'readwrite', (st) => st.put(1, key)).catch(this._warn);
-    return this._fallbackKept();
+  // a kept row: key = mediaKey, value = dedupKey (or 1 when it is unknown)
+  _keepPut(st, item) { st.put(dedupOf(item) || 1, item.mediaKey); },
+  _keepDelete(st, item) { st.delete(item.mediaKey); },
+  _keptAdd(item) { keptAdd(item.mediaKey, dedupOf(item)); },
+  _keptDel(item) { keptRemove(item.mediaKey); },
+  _snapshot() {
+    return { kept: Array.from(kept).map((k) => [k, keptDedupOf.get(k) || null]), marked: new Map(marked) };
   },
-  keepDel(key) {
-    this._assertUsable();
-    kept.delete(key);
-    if (this.db) return this.tx('kept', 'readwrite', (st) => st.delete(key)).catch(this._warn);
-    return this._fallbackKept();
+  _restore(snap) {
+    keptClearAll();
+    snap.kept.forEach(([k, d]) => keptAdd(k, d));
+    marked.clear(); snap.marked.forEach((it, k) => marked.set(k, it));
   },
-  keepAddMany(keys) {
-    this._assertUsable();
-    keys.forEach((k) => kept.add(k));
-    if (this.db) return this.tx('kept', 'readwrite', (st) => keys.forEach((k) => st.put(1, k))).catch(this._warn);
-    return this._fallbackKept();
-  },
+
   async keepClear() {
     this._assertUsable();
     if (this.db) {
       await this.tx('kept', 'readwrite', (st) => st.clear());
-      kept.clear();
+      keptClearAll();
       return;
     }
-    const before = new Set(kept);
-    kept.clear();
+    const snap = this._snapshot();
+    keptClearAll();
     if (this._fallbackKept()) return;
-    before.forEach((key) => kept.add(key));
+    this._restore(snap);
     this._fallbackKept();
     throw new Error('localStorage kept reset failed');
   },
   _fallbackKept() {
-    try { localStorage.setItem(LS_KEPT_LEGACY[1], Array.from(kept).join('\n')); return true; }
+    const rows = Array.from(kept).map((k) => (keptDedupOf.has(k) ? k + '\t' + keptDedupOf.get(k) : k));
+    try { localStorage.setItem(LS_KEPT_LEGACY[1], rows.join('\n')); return true; }
     catch (e) { console.warn('[gpSwipe] could not persist the kept list', e); return false; }
   },
 
@@ -498,52 +593,60 @@ const store = {
     this._assertUsable();
     const key = item && item.mediaKey;
     if (!key || (action !== 'keep' && action !== 'mark')) throw new Error('invalid disposition');
+    // The same photo may already be pending under another key (an album row of
+    // a photo marked from the library, or the reverse). One decision per photo:
+    // that older row goes with this one.
+    const twinKey = item.dedupKey && marked.byDedup.get(item.dedupKey);
+    const twin = twinKey && twinKey !== key ? twinKey : null;
+    const apply = () => {
+      if (action === 'keep') { this._keptAdd(item); marked.delete(key); }
+      else { this._keptDel(item); marked.set(key, item); }
+      if (twin) marked.delete(twin);
+    };
     if (this.db) {
       await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
         const keepStore = tx.objectStore('kept');
         const markStore = tx.objectStore('marked');
-        if (action === 'keep') { keepStore.put(1, key); markStore.delete(key); }
-        else { keepStore.delete(key); markStore.put(item, key); }
+        if (action === 'keep') { this._keepPut(keepStore, item); markStore.delete(key); }
+        else { this._keepDelete(keepStore, item); markStore.put(item, key); }
+        if (twin) markStore.delete(twin);
       });
-      if (action === 'keep') { kept.add(key); marked.delete(key); }
-      else { kept.delete(key); marked.set(key, item); }
+      apply();
       return;
     }
-    const wasKept = kept.has(key);
-    const wasMarked = marked.get(key);
-    if (action === 'keep') { kept.add(key); marked.delete(key); }
-    else { kept.delete(key); marked.set(key, item); }
+    const snap = this._snapshot();
+    apply();
     const keptOk = this._fallbackKept();
     const markedOk = this._fallbackMarked();
     if (keptOk && markedOk) return;
-    if (wasKept) kept.add(key); else kept.delete(key);
-    if (wasMarked) marked.set(key, wasMarked); else marked.delete(key);
+    this._restore(snap);
     this._fallbackKept();
     this._fallbackMarked();
     throw new Error('localStorage decision transaction failed');
   },
 
-  async clearDisposition(key) {
+  // Undo: forget the decision on this photo. Takes the item so the dedup row
+  // can go too; a bare mediaKey is accepted for rows whose item is unknown.
+  async clearDisposition(itemOrKey) {
     this._assertUsable();
+    const key = typeof itemOrKey === 'string' ? itemOrKey : itemOrKey && itemOrKey.mediaKey;
     if (!key) throw new Error('invalid disposition key');
+    const known = typeof itemOrKey === 'object' && itemOrKey ? itemOrKey : (marked.get(key) || { mediaKey: key });
+    const apply = () => { this._keptDel(known); marked.delete(key); };
     if (this.db) {
       await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
-        tx.objectStore('kept').delete(key);
+        this._keepDelete(tx.objectStore('kept'), known);
         tx.objectStore('marked').delete(key);
       });
-      kept.delete(key);
-      marked.delete(key);
+      apply();
       return;
     }
-    const wasKept = kept.has(key);
-    const wasMarked = marked.get(key);
-    kept.delete(key);
-    marked.delete(key);
+    const snap = this._snapshot();
+    apply();
     const keptOk = this._fallbackKept();
     const markedOk = this._fallbackMarked();
     if (keptOk && markedOk) return;
-    if (wasKept) kept.add(key);
-    if (wasMarked) marked.set(key, wasMarked);
+    this._restore(snap);
     this._fallbackKept();
     this._fallbackMarked();
     throw new Error('localStorage undo transaction failed');
@@ -587,22 +690,20 @@ const store = {
   async moveMarkedToKept(items) {
     this._assertUsable();
     if (!items.length) return;
-    const keys = items.map((it) => it.mediaKey);
+    const apply = () => items.forEach((it) => { this._keptAdd(it); marked.delete(it.mediaKey); });
     if (this.db) {
       await this._tx(['kept', 'marked'], 'readwrite', (tx) => {
         const keepStore = tx.objectStore('kept');
         const markStore = tx.objectStore('marked');
-        keys.forEach((k) => { keepStore.put(1, k); markStore.delete(k); });
+        items.forEach((it) => { this._keepPut(keepStore, it); markStore.delete(it.mediaKey); });
       });
-      keys.forEach((k) => { kept.add(k); marked.delete(k); });
+      apply();
       return;
     }
-    const oldMarked = new Map(items.map((it) => [it.mediaKey, marked.get(it.mediaKey)]));
-    const oldKept = new Set(keys.filter((k) => kept.has(k)));
-    keys.forEach((k) => { kept.add(k); marked.delete(k); });
+    const snap = this._snapshot();
+    apply();
     if (!this._fallbackKept() || !this._fallbackMarked()) {
-      keys.forEach((k) => { if (!oldKept.has(k)) kept.delete(k); });
-      oldMarked.forEach((it, key) => { if (it) marked.set(key, it); });
+      this._restore(snap);
       this._fallbackKept();
       this._fallbackMarked();
       throw new Error('localStorage review transaction failed');

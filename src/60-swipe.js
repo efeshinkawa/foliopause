@@ -288,7 +288,7 @@ const swipe = {
     this.busy = true;
     app.renderState();
     try {
-      await store.clearDisposition(item.mediaKey);
+      await store.clearDisposition(item);
       history.pop();
       if (entry.action === 'keep') {
         state.stats.kept = Math.max(0, state.stats.kept - 1);
@@ -333,6 +333,15 @@ const swipe = {
     }
   },
 
+  // A new scan replaces the cards, so swipe entries no longer point at anything
+  // on screen; a confirmed trash batch stays undoable because restoring it does
+  // not depend on the feed.
+  resetHistory() {
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].action !== 'trash') history.splice(i, 1);
+    }
+  },
+
   dropHistory(keys) {
     const gone = keys instanceof Set ? keys : new Set(keys || []);
     for (let i = history.length - 1; i >= 0; i--) {
@@ -343,7 +352,7 @@ const swipe = {
   // put an item back on top of the stack (undo)
   showOnTop(item) {
     feed.drop(item.mediaKey);
-    feed.seen.add(item.mediaKey);
+    feed.markSeen(item);
     if (this.back) { feed.putBack(this.back.item); this.back.el.remove(); this.back = null; }
     if (this.top) { feed.putBack(this.top.item); this.top.el.remove(); this.top = null; }
     const el = this.makeCard(item, false);

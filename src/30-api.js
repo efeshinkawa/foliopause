@@ -9,7 +9,8 @@
 //
 //   lcxiM   list library by taken date      XwAOJf  move to trash / restore
 //   VrseUb  item info (incl. trash stamp)   zy0IHe  list trash
-//   EWgK9e  bulk media info (name + size)
+//   EWgK9e  bulk media info (name + size)   Z5xsfc  list albums
+//   snAcKc  list one album's contents
 // ---------------------------------------------------------------------------
 
 const WIZ = window.WIZ_global_data || {};
@@ -120,6 +121,34 @@ function parseItem(d) {
     isLive: !!ext[146008172],
     isFavorite: !!(ext[163238866] && ext[163238866][0] === true),
     place: place,
+    // Who uploaded it. Only meaningful inside a shared album, where rows
+    // added by other people sit next to the user's own.
+    ownerActor: actorOf(d[6]),
+  };
+}
+
+const actorOf = (v) => (Array.isArray(v) && typeof v[0] === 'string' && v[0] ? v[0] : null);
+
+// An album row from `Z5xsfc`. Its descriptive block sits under key 72930366 in
+// the trailing object: [kind, title, [timestamps…], itemCount, isShared,
+// authKey, …]. kind 1 is an album the user made (possibly shared out); kind 4
+// is one somebody else shared with them, whose rows are not in this library.
+function parseAlbum(d) {
+  if (!Array.isArray(d) || typeof d[0] !== 'string' || !d[0]) return null;
+  const meta = extOf(d)[72930366];
+  if (!Array.isArray(meta)) return null;
+  const range = Array.isArray(meta[2]) ? meta[2] : [];
+  return {
+    mediaKey: d[0],
+    thumb: d[1] && typeof d[1][0] === 'string' ? d[1][0] : null,
+    ownerActor: actorOf(d[6]),
+    kind: typeof meta[0] === 'number' ? meta[0] : null,
+    title: typeof meta[1] === 'string' ? meta[1] : '',
+    itemCount: typeof meta[3] === 'number' ? meta[3] : null,
+    isShared: meta[4] === true,
+    authKey: typeof meta[5] === 'string' && meta[5] ? meta[5] : null,
+    startTs: numTs(range[0]),
+    endTs: numTs(range[1]),
   };
 }
 
@@ -163,6 +192,48 @@ const api = {
       rawItemCount: rows.length,
       nextPageId: (r && r[1]) || null,
       lastItemTimestamp: r && r[2] != null && Number.isFinite(Number(r[2])) ? Number(r[2]) : null,
+    };
+  },
+
+  // Albums the account can see, newest activity first, 100 per page. Read
+  // only: the scan menu lets the user pick one as the source.
+  async listAlbums(o) {
+    o = o || {};
+    const r = await rpc(
+      'Z5xsfc',
+      [o.pageId || null, null, null, null, 1, null, null, o.pageSize || 100, [2], 5],
+      { retries: 2, timeoutMs: 10000 }
+    );
+    if (!Array.isArray(r) || (r[0] != null && !Array.isArray(r[0]))) throw new Error('unexpected albums response');
+    const rows = r[0] || [];
+    return {
+      albums: rows.map(parseAlbum).filter(Boolean),
+      rawItemCount: rows.length,
+      nextPageId: typeof r[1] === 'string' && r[1] ? r[1] : null,
+    };
+  },
+
+  // One page of an album's contents. Rows use the library row layout, so the
+  // same parser applies. Unlike the library listing, the final page carries an
+  // empty-string continuation token rather than null; both mean "done".
+  async listAlbumPage(albumKey, o) {
+    o = o || {};
+    if (!validRpcKey(albumKey)) throw new Error('invalid album key');
+    const r = await rpc(
+      'snAcKc',
+      [albumKey, o.pageId || null, null, o.authKey || null],
+      { retries: 2, timeoutMs: 10000 }
+    );
+    if (!Array.isArray(r) || (r[1] != null && !Array.isArray(r[1]))) throw new Error('unexpected album response');
+    const rows = r[1] || [];
+    const meta = Array.isArray(r[3]) ? r[3] : [];
+    return {
+      items: rows.map(parseItem).filter(Boolean),
+      rawItemCount: rows.length,
+      nextPageId: typeof r[2] === 'string' && r[2] ? r[2] : null,
+      title: typeof meta[1] === 'string' ? meta[1] : '',
+      ownerActor: actorOf(meta[5]),
+      itemCount: typeof meta[21] === 'number' ? meta[21] : null,
     };
   },
 
@@ -224,17 +295,26 @@ const api = {
   // Media keys currently sitting in Trash. Continue until the requested keys
   // have all been found or Google says there is no next page; a large existing
   // Trash must not make a newly deleted photo look unverified by accident.
+  // `want` may hold items; a wanted item counts as found by either of its
+  // identifiers, since a trash row carries the library mediaKey at [0] and the
+  // dedupKey at [3] while an album-sourced item only shares the latter.
   async trashKeys(opts) {
     opts = opts || {};
-    const want = new Set(opts.want || []);
+    const want = (opts.want || []).map((w) => (typeof w === 'string' ? { mediaKey: w } : w));
     const out = new Set();
+    const dedup = new Set();
+    Object.defineProperty(out, 'dedup', { value: dedup, enumerable: false });
     const seenTokens = new Set();
     let pageId = null;
     let complete = false;
     for (let page = 0; page < 100; page++) {
       const r = await rpc('zy0IHe', [pageId], opts);
-      ((r && r[0]) || []).forEach((row) => { if (row && row[0]) out.add(row[0]); });
-      if (!opts.scanAll && want.size && Array.from(want).every((k) => out.has(k))) break;
+      ((r && r[0]) || []).forEach((row) => {
+        if (!Array.isArray(row)) return;
+        if (typeof row[0] === 'string' && row[0]) out.add(row[0]);
+        if (typeof row[3] === 'string' && row[3]) dedup.add(row[3]);
+      });
+      if (!opts.scanAll && want.length && want.every((w) => inTrash(out, w))) break;
       const next = (r && r[1]) || null;
       if (!next) { complete = true; break; }
       if (seenTokens.has(String(next))) throw new Error('trash pagination token repeated');
@@ -261,6 +341,13 @@ const api = {
     return out;
   },
 };
+
+// Whether a trash listing from trashKeys() holds this photo, by either identifier.
+function inTrash(keys, item) {
+  if (!keys || !item) return false;
+  if (typeof item.mediaKey === 'string' && keys.has(item.mediaKey)) return true;
+  return !!(keys.dedup && typeof item.dedupKey === 'string' && keys.dedup.has(item.dedupKey));
+}
 
 // image / video URLs served by Google's own CDN for this session
 const imgUrl = (it, size) => it.thumb + '=w' + size + '-h' + size + '-k-no';
@@ -372,5 +459,6 @@ function playVideoIn(host, item, before, onState) {
   return ctl;
 }
 
-const photoPageUrl = (it) => BASE + 'photo/' + it.mediaKey;
+// An album row's key only resolves inside its album.
+const photoPageUrl = (it) => (it.albumKey ? BASE + 'album/' + it.albumKey + '/photo/' + it.mediaKey : BASE + 'photo/' + it.mediaKey);
 const trashPageUrl = () => BASE + 'trash';

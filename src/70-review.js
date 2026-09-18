@@ -215,6 +215,7 @@ const review = {
       session.marked = Math.max(0, session.marked - all.length);
       state.sinceReview = 0;
       state.cursorTs = null;
+      state.cursorFloorTs = null;
       swipe.dropHistory(new Set(all.map((it) => it.mediaKey)));
       this.selected.clear();
       persist(true);
@@ -380,13 +381,13 @@ const review = {
       if (acknowledged.length) {
         app.snack(t('verifying'), { ms: 3000 });
         try {
-          trashKeys = await api.trashKeys({ retries: 2, want: acknowledged.map((i) => i.mediaKey) });
+          trashKeys = await api.trashKeys({ retries: 2, want: acknowledged });
           verificationWorked = true;
         } catch (e) {
           console.warn('[gpSwipe] trash listing verification failed', e);
         }
       }
-      const verifiedItems = verificationWorked ? acknowledged.filter((i) => trashKeys.has(i.mediaKey)) : [];
+      const verifiedItems = verificationWorked ? acknowledged.filter((i) => inTrash(trashKeys, i)) : [];
       let okItems = verifiedItems;
 
       // The local marked row and deletion log are one atomic commit. If that
@@ -475,7 +476,7 @@ const review = {
           // scan can prove an acknowledged item is no longer there.
           const trashKeys = await api.trashKeys({ retries: 2, scanAll: true });
           if (!trashKeys.complete) throw new Error('trash scan safety limit reached');
-          verified = acknowledged.filter((i) => !trashKeys.has(i.mediaKey));
+          verified = acknowledged.filter((i) => !inTrash(trashKeys, i));
         } catch (e) {
           console.warn('[gpSwipe] restore verification failed', e);
         }
